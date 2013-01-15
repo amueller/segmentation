@@ -14,14 +14,14 @@ tracer = Tracer()
 
 def main():
     # get some data
-    X, Y = toy.generate_square_with_hole(n_samples=40, noise=5, total_size=7)
+    X, Y = toy.generate_square_with_hole(n_samples=80, noise=5, total_size=7)
     X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=.5)
 
     # train a latent grid crf
     n_labels = len(np.unique(Y_train))
     crf = LatentDirectionalGridCRF(n_labels=n_labels, n_states_per_label=8,
                                    inference_method='lp')
-    clf = LatentSSVM(problem=crf, max_iter=50, C=10., verbose=2,
+    clf = LatentSSVM(problem=crf, max_iter=50, C=100., verbose=2,
                      check_constraints=True, n_jobs=-1, break_on_bad=True,
                      plot=True)
     clf.fit(X_train, Y_train)
