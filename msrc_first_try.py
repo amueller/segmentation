@@ -3,13 +3,15 @@ from glob import glob
 
 import numpy as np
 import matplotlib.pyplot as plt
-#from scipy.misc import imread
+from scipy.misc import imread
 
 from sklearn.externals.joblib import Memory
 #from sklearn.preprocessing import StandardScaler
 
 #from datasets.msrc import MSRCDataset
 from pystruct.utils import make_grid_edges
+from pystruct.problems import GraphCRF
+from pystruct.learners import StructuredSVM
 
 
 from IPython.core.debugger import Tracer
@@ -59,13 +61,15 @@ def region_graph(regions):
 
     crossings = edges[regions.ravel()[edges[:, 0]]
                       != regions.ravel()[edges[:, 1]]]
-    crossing_hash = crossings[:, 0] + n_vertices * crossings[:, 1]
+    crossing_hash = (regions.ravel()[crossings[:, 0]]
+                     + n_vertices * regions.ravel()[crossings[:, 1]])
     # find unique connections
     unique_hash = np.unique(crossing_hash)
     # undo hashing
     unique_crossings = np.asarray([[x % n_vertices, x / n_vertices]
                                    for x in unique_hash])
-    if True:
+    if False:
+        # plotting code
         # compute region centers:
         gridx, gridy = np.mgrid[:regions.shape[0], :regions.shape[1]]
         centers = np.zeros((n_vertices, 2))
@@ -75,11 +79,10 @@ def region_graph(regions):
         # plot labels
         plt.imshow(regions)
         # overlay graph:
-        for edge in edges:
-            plt.plot([centers[edge[0]][0], centers[edge[1]][0]],
-                     [centers[edge[0]][1], centers[edge[1]][1]])
+        for crossing in unique_crossings:
+            plt.plot([centers[crossing[0]][0], centers[crossing[1]][0]],
+                     [centers[crossing[0]][1], centers[crossing[1]][1]])
         plt.show()
-    tracer()
     return unique_crossings
 
 
@@ -89,23 +92,36 @@ def main():
     car_idx = np.where(classes == "car")[0]
     ds_path = base_path + "Train"
     image_names = []
-    X = []
+    X, Y = [], []
     for f in glob(ds_path + "/*.dat"):
         name = os.path.basename(f).split('.')[0]
+        img = imread("%s/%s.bmp" % (ds_path, name))
         labels = np.loadtxt(base_path + "labels/%s.txt" % name, dtype=np.int)
         if car_idx not in labels:
             continue
         image_names.append(name)
         # features
+        #feat = np.hstack([np.loadtxt("%s/%s.local%s" % (ds_path, name, i)) for
+                          #i in xrange(1, 7)])
         feat = np.hstack([np.loadtxt("%s/%s.local%s" % (ds_path, name, i)) for
-                          i in xrange(1, 7)])
+                          i in xrange(1, 2)])
         # superpixels
         superpixels = np.fromfile("%s/%s.dat" % (ds_path, name),
                                   dtype=np.int32)
-        superpixels = superpixels.reshape(superpixels.shape[:-1][::-1]).T
+        superpixels = superpixels.reshape(img.shape[:-1][::-1]).T - 1
         # generate graph
         graph = region_graph(superpixels)
         X.append((feat, graph))
+        Y.append(labels)
+    #n_states = len(np.unique(Y))
+    n_states = 23
+    print("number of samples: %s" % len(X))
+    problem = GraphCRF(n_states=n_states, n_features=21,
+                       inference_method='lp')
+    ssvm = StructuredSVM(problem, verbose=2, check_constraints=True, C=.1,
+                         n_jobs=-1, break_on_bad=False)
+    ssvm.fit(X, Y)
+    tracer()
 
 
 if __name__ == "__main__":
