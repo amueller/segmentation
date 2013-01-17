@@ -6,12 +6,14 @@ import matplotlib.pyplot as plt
 from scipy.misc import imread
 
 from sklearn.externals.joblib import Memory
+from sklearn.metrics import confusion_matrix
 #from sklearn.preprocessing import StandardScaler
 
 #from datasets.msrc import MSRCDataset
 from pystruct.utils import make_grid_edges
 from pystruct.problems import GraphCRF
-from pystruct.learners import StructuredSVM
+#from pystruct.learners import StructuredSVM
+from pystruct.learners import SubgradientStructuredSVM
 
 
 from IPython.core.debugger import Tracer
@@ -86,6 +88,15 @@ def region_graph(regions):
     return unique_crossings
 
 
+def plot_confusion_matrix(matrix):
+    plt.matshow(matrix)
+    plt.axis("off")
+    plt.colorbar()
+    for i, c in enumerate(classes[:-2]):
+        plt.text(i, -1, c, rotation=60, va='bottom')
+        plt.text(-1, i, c, ha='right')
+
+
 def main():
     # load training data
     # let's just do images with cars first.
@@ -110,17 +121,35 @@ def main():
                                   dtype=np.int32)
         superpixels = superpixels.reshape(img.shape[:-1][::-1]).T - 1
         # generate graph
-        graph = region_graph(superpixels)
-        X.append((feat, graph))
+        #graph = region_graph(superpixels)
+        #X.append((feat, graph))
+        X.append((feat, np.empty((0, 2), dtype=np.int)))
         Y.append(labels)
     #n_states = len(np.unique(Y))
-    n_states = 23
+    n_states = 22
     print("number of samples: %s" % len(X))
     problem = GraphCRF(n_states=n_states, n_features=21,
-                       inference_method='lp')
-    ssvm = StructuredSVM(problem, verbose=2, check_constraints=True, C=.1,
-                         n_jobs=-1, break_on_bad=False)
+                       inference_method='qpbo')
+    #ssvm = StructuredSVM(problem, verbose=1, check_constraints=True, C=.1,
+                         #n_jobs=-1, break_on_bad=False, max_iter=100)
+    ssvm = SubgradientStructuredSVM(problem, verbose=1, C=.1, n_jobs=-1,
+                                    max_iter=100)
     ssvm.fit(X, Y)
+
+    # do some evaluation on the training set
+    print("loss on training set: %d" % -ssvm.score(X, Y))
+    Y_pred = ssvm.predict(X)
+    # compute confusion matrix
+    confusion = np.zeros((n_states, n_states))
+    for y, y_pred in zip(Y, Y_pred):
+        confusion += confusion_matrix(y, y_pred, labels=np.arange(n_states))
+    plot_confusion_matrix(confusion)
+
+    # plot pairwise weights
+    pairwise_flat = np.asarray(ssvm.w[problem.n_states * problem.n_features:])
+    pairwise_params = np.zeros((problem.n_states, problem.n_states))
+    pairwise_params[np.tri(problem.n_states, dtype=np.bool)] = pairwise_flat
+    plot_confusion_matrix(confusion)
     tracer()
 
 
