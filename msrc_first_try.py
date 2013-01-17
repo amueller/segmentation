@@ -88,13 +88,15 @@ def region_graph(regions):
     return unique_crossings
 
 
-def plot_confusion_matrix(matrix):
+def plot_confusion_matrix(matrix, title=None):
     plt.matshow(matrix)
     plt.axis("off")
     plt.colorbar()
     for i, c in enumerate(classes[:-2]):
         plt.text(i, -1, c, rotation=60, va='bottom')
         plt.text(-1, i, c, ha='right')
+    if title:
+        plt.title(title)
 
 
 def main():
@@ -102,7 +104,7 @@ def main():
     # let's just do images with cars first.
     car_idx = np.where(classes == "car")[0]
     ds_path = base_path + "Train"
-    image_names = []
+    image_names, images, all_superpixels = [], [], []
     X, Y = [], []
     for f in glob(ds_path + "/*.dat"):
         name = os.path.basename(f).split('.')[0]
@@ -110,6 +112,7 @@ def main():
         labels = np.loadtxt(base_path + "labels/%s.txt" % name, dtype=np.int)
         if car_idx not in labels:
             continue
+        images.append(img)
         image_names.append(name)
         # features
         #feat = np.hstack([np.loadtxt("%s/%s.local%s" % (ds_path, name, i)) for
@@ -120,6 +123,7 @@ def main():
         superpixels = np.fromfile("%s/%s.dat" % (ds_path, name),
                                   dtype=np.int32)
         superpixels = superpixels.reshape(img.shape[:-1][::-1]).T - 1
+        all_superpixels.append(superpixels)
         # generate graph
         #graph = region_graph(superpixels)
         #X.append((feat, graph))
@@ -132,24 +136,45 @@ def main():
                        inference_method='qpbo')
     #ssvm = StructuredSVM(problem, verbose=1, check_constraints=True, C=.1,
                          #n_jobs=-1, break_on_bad=False, max_iter=100)
-    ssvm = SubgradientStructuredSVM(problem, verbose=1, C=.1, n_jobs=-1,
-                                    max_iter=100)
+    ssvm = SubgradientStructuredSVM(problem, verbose=1, C=100, n_jobs=-1,
+                                    max_iter=100, learning_rate=0.0005,
+                                    plot=True)
     ssvm.fit(X, Y)
 
     # do some evaluation on the training set
-    print("loss on training set: %d" % -ssvm.score(X, Y))
+    print("score on training set: %f" % ssvm.score(X, Y))
     Y_pred = ssvm.predict(X)
     # compute confusion matrix
     confusion = np.zeros((n_states, n_states))
     for y, y_pred in zip(Y, Y_pred):
         confusion += confusion_matrix(y, y_pred, labels=np.arange(n_states))
-    plot_confusion_matrix(confusion)
+    plot_confusion_matrix(confusion, title="confusion")
 
     # plot pairwise weights
     pairwise_flat = np.asarray(ssvm.w[problem.n_states * problem.n_features:])
     pairwise_params = np.zeros((problem.n_states, problem.n_states))
     pairwise_params[np.tri(problem.n_states, dtype=np.bool)] = pairwise_flat
-    plot_confusion_matrix(confusion)
+    plot_confusion_matrix(pairwise_params, title="pairwise_params")
+
+    # make figures with predictions
+    for image, image_name, superpixels, y, y_pred in zip(images, image_names,
+                                                         all_superpixels, Y,
+                                                         Y_pred):
+        fig, axes = plt.subplots(1, 3)
+        axes[0].imshow(image)
+        axes[1].set_title("ground truth")
+        axes[1].imshow(image)
+        axes[1].imshow(y[superpixels], vmin=0, vmax=23, alpha=.5)
+        axes[2].set_title("prediction")
+        axes[2].imshow(image)
+        axes[2].imshow(y_pred[superpixels], vmin=0, vmax=23, alpha=.5)
+        for ax in axes.ravel():
+            ax.set_xticks(())
+            ax.set_yticks(())
+        fig.savefig("figures/%s.png" % image_name, bbox_inches="tight")
+        plt.close(fig)
+    plt.show()
+
     tracer()
 
 
