@@ -19,8 +19,8 @@ pblm = CrammerSingerSVMProblem(n_classes=10, n_features=28 ** 2)
                                #max_iter=10, batch=False, learning_rate=0.0001,
                                #momentum=0)
 svm = SubgradientStructuredSVM(pblm, verbose=10, n_jobs=1, plot=True,
-                               max_iter=5, batch=False, momentum=.9,
-                               learning_rate=0.001, show_loss='real', C=1000)
+                               max_iter=2, batch=False, momentum=.9,
+                               learning_rate=0.001, show_loss='true', C=1000)
 svm.fit(X_train, y_train)
 print(svm.score(X_train, y_train))
 print(svm.score(X_test, y_test))

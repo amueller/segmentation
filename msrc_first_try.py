@@ -11,15 +11,26 @@ from sklearn.metrics import confusion_matrix
 
 #from datasets.msrc import MSRCDataset
 from pystruct.utils import make_grid_edges
+from pystruct.learners import StructuredSVM
+#from pystruct.learners import SubgradientStructuredSVM
 from pystruct.problems import GraphCRF
-#from pystruct.learners import StructuredSVM
-from pystruct.learners import SubgradientStructuredSVM
 
+#from ignore_void_crf import IgnoreVoidCRF
 
 from IPython.core.debugger import Tracer
 tracer = Tracer()
 
 memory = Memory(cachedir="cache")
+
+colors = np.array(
+    [[128, 0, 0], [0, 128, 0], [128, 128, 0], [0, 0, 128],
+     # [128, 0, 128], horse
+     [0, 128, 128], [128, 128, 128],
+     # [64, 0, 0], mountain
+     [192, 0, 0], [64, 128, 0], [192, 128, 0], [64, 0, 128],
+     [192, 0, 128], [64, 128, 128], [192, 128, 128], [0, 64, 0],
+     [128, 64, 0], [0, 192, 0], [128, 64, 128], [0, 192, 128],
+     [128, 192, 128], [64, 64, 0], [192, 64, 0], [0, 0, 0]])
 
 classes = np.array(['building', 'grass', 'tree', 'cow', 'sheep', 'sky',
                     'aeroplane', 'water', 'face', 'car', 'bicycle', 'flower',
@@ -29,7 +40,7 @@ classes = np.array(['building', 'grass', 'tree', 'cow', 'sheep', 'sky',
 base_path = "/home/VI/staff/amueller/datasets/aurelien_msrc_features/msrc/"
 
 
-def load_data(dataset="train"):
+def load_data(dataset="train", independent=False):
     mountain_idx = np.where(classes == "mountain")[0]
     horse_idx = np.where(classes == "horse")[0]
     void_idx = np.where(classes == "void")[0]
@@ -48,19 +59,21 @@ def load_data(dataset="train"):
         images.append(img)
         image_names.append(name)
         # features
-        #feat = np.hstack([np.loadtxt("%s/%s.local%s" % (ds_path, name, i)) for
-                          #i in xrange(1, 7)])
         feat = np.hstack([np.loadtxt("%s/%s.local%s" % (ds_path, name, i)) for
-                          i in xrange(1, 2)])
+                          i in xrange(1, 7)])
+        #feat = np.hstack([np.loadtxt("%s/%s.local%s" % (ds_path, name, i)) for
+                          #i in xrange(1, 2)])
         # superpixels
         superpixels = np.fromfile("%s/%s.dat" % (ds_path, name),
                                   dtype=np.int32)
         superpixels = superpixels.reshape(img.shape[:-1][::-1]).T - 1
         all_superpixels.append(superpixels)
         # generate graph
-        graph = region_graph(superpixels)
-        X.append((feat, graph))
-        #X.append((feat, np.empty((0, 2), dtype=np.int)))
+        if independent:
+            X.append((feat, np.empty((0, 2), dtype=np.int)))
+        else:
+            graph = region_graph(superpixels)
+            X.append((feat, graph))
         # make horse and mountain to void
         labels[labels == mountain_idx] = void_idx
         labels[labels == horse_idx] = void_idx
@@ -114,17 +127,22 @@ def main():
     # load training data
     # let's just do images with cars first.
     #car_idx = np.where(classes == "car")[0]
-    X, Y, image_names, images, all_superpixels = load_data("train")
+    independent = True
+    X, Y, image_names, images, all_superpixels = load_data(
+        "train", independent=independent)
     #n_states = len(np.unique(Y))
     n_states = 22
     print("number of samples: %s" % len(X))
-    problem = GraphCRF(n_states=n_states, n_features=21,
+    #problem = IgnoreVoidCRF(n_states=n_states, n_features=21,
+                            #inference_method='qpbo')
+    problem = GraphCRF(n_states=n_states, n_features=21 * 6,
                        inference_method='qpbo')
-    #ssvm = StructuredSVM(problem, verbose=1, check_constraints=True, C=.1,
-                         #n_jobs=-1, break_on_bad=False, max_iter=100)
-    ssvm = SubgradientStructuredSVM(problem, verbose=1, C=100, n_jobs=-1,
-                                    max_iter=100, learning_rate=0.0005,
-                                    plot=True)
+    ssvm = StructuredSVM(problem, verbose=2, check_constraints=True, C=10,
+                         n_jobs=-1, break_on_bad=False, max_iter=10,
+                         show_loss='true')
+    #ssvm = SubgradientStructuredSVM(problem, verbose=1, C=100, n_jobs=-1,
+                                    #max_iter=100, learning_rate=0.0001,
+                                    #plot=True, show_loss='true')
     ssvm.fit(X, Y)
 
     # do some evaluation on the training set
@@ -146,14 +164,19 @@ def main():
     for image, image_name, superpixels, y, y_pred in zip(images, image_names,
                                                          all_superpixels, Y,
                                                          Y_pred):
-        fig, axes = plt.subplots(1, 3)
+        fig, axes = plt.subplots(1, 4, figsize=(12, 3))
         axes[0].imshow(image)
         axes[1].set_title("ground truth")
         axes[1].imshow(image)
-        axes[1].imshow(y[superpixels], vmin=0, vmax=23, alpha=.5)
+        axes[1].imshow(colors[y[superpixels]], vmin=0, vmax=23, alpha=.5)
         axes[2].set_title("prediction")
         axes[2].imshow(image)
-        axes[2].imshow(y_pred[superpixels], vmin=0, vmax=23, alpha=.5)
+        axes[2].imshow(colors[y_pred[superpixels]], vmin=0, vmax=23, alpha=.5)
+        present_y = np.unique(np.hstack([y, y_pred]))
+        axes[3].imshow(colors[present_y, :][:, np.newaxis, :],
+                       interpolation='nearest')
+        for i, c in enumerate(present_y):
+            axes[3].text(1, i, classes[c])
         for ax in axes.ravel():
             ax.set_xticks(())
             ax.set_yticks(())
