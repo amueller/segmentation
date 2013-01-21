@@ -29,7 +29,6 @@ classes = np.array(['building', 'grass', 'tree', 'cow', 'sheep', 'sky',
 base_path = "/home/VI/staff/amueller/datasets/aurelien_msrc_features/msrc/"
 
 
-@memory.cache
 def load_data(dataset="train"):
     mountain_idx = np.where(classes == "mountain")[0]
     horse_idx = np.where(classes == "horse")[0]
@@ -39,22 +38,34 @@ def load_data(dataset="train"):
     if dataset not in ds_dict.keys():
         raise ValueError("dataset must be one of 'train', 'val', 'test',"
                          " got %s" % dataset)
-    ds_path = ds_dict[dataset]
-    features = []
-    labels = []
+    ds_path = base_path + ds_dict[dataset]
+    image_names, images, all_superpixels = [], [], []
+    X, Y = [], []
     for f in glob(ds_path + "/*.dat"):
         name = os.path.basename(f).split('.')[0]
-        labels.append(np.loadtxt("labels/%s.txt" % name, dtype=np.int))
-        feat = [np.loadtxt("%s/%s.local%s" % (ds_path, name, i))
-                for i in xrange(1, 7)]
-        features.append(np.hstack(feat))
-    features = np.vstack(features)
-    labels = np.hstack(labels)
-    features = features[(labels != mountain_idx) * (labels != void_idx)
-                        * (labels != horse_idx)]
-    labels = labels[(labels != mountain_idx) * (labels != void_idx)
-                    * (labels != horse_idx)]
-    return features, labels
+        img = imread("%s/%s.bmp" % (ds_path, name))
+        labels = np.loadtxt(base_path + "labels/%s.txt" % name, dtype=np.int)
+        images.append(img)
+        image_names.append(name)
+        # features
+        #feat = np.hstack([np.loadtxt("%s/%s.local%s" % (ds_path, name, i)) for
+                          #i in xrange(1, 7)])
+        feat = np.hstack([np.loadtxt("%s/%s.local%s" % (ds_path, name, i)) for
+                          i in xrange(1, 2)])
+        # superpixels
+        superpixels = np.fromfile("%s/%s.dat" % (ds_path, name),
+                                  dtype=np.int32)
+        superpixels = superpixels.reshape(img.shape[:-1][::-1]).T - 1
+        all_superpixels.append(superpixels)
+        # generate graph
+        graph = region_graph(superpixels)
+        X.append((feat, graph))
+        #X.append((feat, np.empty((0, 2), dtype=np.int)))
+        # make horse and mountain to void
+        labels[labels == mountain_idx] = void_idx
+        labels[labels == horse_idx] = void_idx
+        Y.append(labels)
+    return X, Y, image_names, images, all_superpixels
 
 
 def region_graph(regions):
@@ -102,33 +113,8 @@ def plot_confusion_matrix(matrix, title=None):
 def main():
     # load training data
     # let's just do images with cars first.
-    car_idx = np.where(classes == "car")[0]
-    ds_path = base_path + "Train"
-    image_names, images, all_superpixels = [], [], []
-    X, Y = [], []
-    for f in glob(ds_path + "/*.dat"):
-        name = os.path.basename(f).split('.')[0]
-        img = imread("%s/%s.bmp" % (ds_path, name))
-        labels = np.loadtxt(base_path + "labels/%s.txt" % name, dtype=np.int)
-        if car_idx not in labels:
-            continue
-        images.append(img)
-        image_names.append(name)
-        # features
-        #feat = np.hstack([np.loadtxt("%s/%s.local%s" % (ds_path, name, i)) for
-                          #i in xrange(1, 7)])
-        feat = np.hstack([np.loadtxt("%s/%s.local%s" % (ds_path, name, i)) for
-                          i in xrange(1, 2)])
-        # superpixels
-        superpixels = np.fromfile("%s/%s.dat" % (ds_path, name),
-                                  dtype=np.int32)
-        superpixels = superpixels.reshape(img.shape[:-1][::-1]).T - 1
-        all_superpixels.append(superpixels)
-        # generate graph
-        #graph = region_graph(superpixels)
-        #X.append((feat, graph))
-        X.append((feat, np.empty((0, 2), dtype=np.int)))
-        Y.append(labels)
+    #car_idx = np.where(classes == "car")[0]
+    X, Y, image_names, images, all_superpixels = load_data("train")
     #n_states = len(np.unique(Y))
     n_states = 22
     print("number of samples: %s" % len(X))
