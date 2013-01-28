@@ -11,11 +11,12 @@ from sklearn.metrics import confusion_matrix
 
 #from datasets.msrc import MSRCDataset
 from pystruct.utils import make_grid_edges
-from pystruct.learners import StructuredSVM
+#from pystruct.learners import StructuredSVM
 #from pystruct.learners import SubgradientStructuredSVM
-from pystruct.problems import GraphCRF
-
-#from ignore_void_crf import IgnoreVoidCRF
+from pystruct.learners import OneSlackSSVM
+from pystruct.problems.latent_graph_crf import kmeans_init
+#from pystruct.problems import GraphCRF
+from ignore_void_crf import IgnoreVoidCRF
 
 from IPython.core.debugger import Tracer
 tracer = Tracer()
@@ -40,6 +41,7 @@ classes = np.array(['building', 'grass', 'tree', 'cow', 'sheep', 'sky',
 base_path = "/home/VI/staff/amueller/datasets/aurelien_msrc_features/msrc/"
 
 
+@memory.cache
 def load_data(dataset="train", independent=False):
     mountain_idx = np.where(classes == "mountain")[0]
     horse_idx = np.where(classes == "horse")[0]
@@ -123,27 +125,87 @@ def plot_confusion_matrix(matrix, title=None):
         plt.title(title)
 
 
+def plot_results(images, image_names, X, Y, Y_pred, all_superpixels,
+                 folder="figures", use_colors_predict=True):
+    if not os.path.exists(folder):
+        os.mkdir(folder)
+    import matplotlib.colors as cl
+    random_colormap = cl.ListedColormap(np.random.uniform(size=(100, 3)))
+    for image, image_name, superpixels, y, y_pred in zip(images, image_names,
+                                                         all_superpixels, Y,
+                                                         Y_pred):
+        fig, axes = plt.subplots(1, 4, figsize=(12, 3))
+        axes[0].imshow(image)
+        axes[1].set_title("ground truth")
+        axes[1].imshow(image)
+        axes[1].imshow(colors[y[superpixels]], vmin=0, vmax=23, alpha=.7)
+        axes[2].set_title("prediction")
+        axes[2].imshow(image)
+        if use_colors_predict:
+            axes[2].imshow(colors[y_pred[superpixels]], vmin=0, vmax=23,
+                           alpha=.7)
+        else:
+            vmax = np.max(np.hstack(Y_pred))
+            axes[2].imshow(y_pred[superpixels], vmin=0, vmax=vmax, alpha=.9,
+                           cmap=random_colormap)
+        if use_colors_predict:
+            present_y = np.unique(np.hstack([y, y_pred]))
+        else:
+            present_y = np.unique(y)
+        axes[3].imshow(colors[present_y, :][:, np.newaxis, :],
+                       interpolation='nearest')
+        for i, c in enumerate(present_y):
+            axes[3].text(1, i, classes[c])
+        for ax in axes.ravel():
+            ax.set_xticks(())
+            ax.set_yticks(())
+        fig.savefig(folder + "/%s.png" % image_name, bbox_inches="tight")
+        plt.close(fig)
+
+
+def plot_parts():
+    car_idx = np.where(classes == "car")[0]
+    X, Y, image_names, images, all_superpixels = load_data(
+        "train", independent=False)
+    car_images = np.array([i for i, y in enumerate(Y) if np.any(y == car_idx)])
+    flat_X = [x[0] for x in X]
+    edges = [[x[1]] for x in X]
+
+    H = kmeans_init(flat_X, Y, edges, n_labels=23, n_states_per_label=6,
+                    symmetric=True)
+    X, Y, image_names, images, all_superpixels, H = zip(*[
+        (X[i], Y[i], image_names[i], images[i], all_superpixels[i], H[i])
+        for i in car_images])
+    plot_results(images, image_names, X, Y, H, all_superpixels,
+                 folder="test_parts", use_colors_predict=False)
+    tracer()
+
+
 def main():
     # load training data
-    # let's just do images with cars first.
-    #car_idx = np.where(classes == "car")[0]
     independent = True
     X, Y, image_names, images, all_superpixels = load_data(
         "train", independent=independent)
-    #n_states = len(np.unique(Y))
     n_states = 22
     print("number of samples: %s" % len(X))
     #problem = IgnoreVoidCRF(n_states=n_states, n_features=21,
                             #inference_method='qpbo')
-    problem = GraphCRF(n_states=n_states, n_features=21 * 6,
-                       inference_method='qpbo')
-    ssvm = StructuredSVM(problem, verbose=2, check_constraints=True, C=10,
-                         n_jobs=-1, break_on_bad=False, max_iter=10,
-                         show_loss='true')
-    #ssvm = SubgradientStructuredSVM(problem, verbose=1, C=100, n_jobs=-1,
-                                    #max_iter=100, learning_rate=0.0001,
-                                    #plot=True, show_loss='true')
+    problem = IgnoreVoidCRF(n_states=n_states, n_features=21 * 6,
+                            inference_method='lp')
+    #ssvm = StructuredSVM(problem, verbose=2, check_constraints=True, C=10,
+                         #n_jobs=-1, break_on_bad=False, max_iter=30,
+                         #show_loss='true')
+    # 80% on training set with C=100, lr=0.000001, max_iter=100
+    # score on training set: 0.843112 with ignoreVoidCRF, max_iter=100
+    # score on training set: 0.850884 with C=100, max_iter=100, pairwise.
+    # val:0.78365315031101435
+    #ssvm = SubgradientStructuredSVM(problem, verbose=1, C=10000000, n_jobs=-1,
+                                    #max_iter=1, learning_rate=0.0000001)
+    # OneSlack, C=10, max_iter=200, score on training set: 0.689209
+    ssvm = OneSlackSSVM(problem, verbose=10, C=100, max_iter=500, n_jobs=-1)
+    #ssvm.w = np.load("pairwise_w.npy")
     ssvm.fit(X, Y)
+    print("fit finished!")
 
     # do some evaluation on the training set
     print("score on training set: %f" % ssvm.score(X, Y))
@@ -159,33 +221,23 @@ def main():
     pairwise_params = np.zeros((problem.n_states, problem.n_states))
     pairwise_params[np.tri(problem.n_states, dtype=np.bool)] = pairwise_flat
     plot_confusion_matrix(pairwise_params, title="pairwise_params")
+    plt.figure()
+    plt.plot(ssvm.objective_curve_)
+    plt.show()
 
     # make figures with predictions
-    for image, image_name, superpixels, y, y_pred in zip(images, image_names,
-                                                         all_superpixels, Y,
-                                                         Y_pred):
-        fig, axes = plt.subplots(1, 4, figsize=(12, 3))
-        axes[0].imshow(image)
-        axes[1].set_title("ground truth")
-        axes[1].imshow(image)
-        axes[1].imshow(colors[y[superpixels]], vmin=0, vmax=23, alpha=.5)
-        axes[2].set_title("prediction")
-        axes[2].imshow(image)
-        axes[2].imshow(colors[y_pred[superpixels]], vmin=0, vmax=23, alpha=.5)
-        present_y = np.unique(np.hstack([y, y_pred]))
-        axes[3].imshow(colors[present_y, :][:, np.newaxis, :],
-                       interpolation='nearest')
-        for i, c in enumerate(present_y):
-            axes[3].text(1, i, classes[c])
-        for ax in axes.ravel():
-            ax.set_xticks(())
-            ax.set_yticks(())
-        fig.savefig("figures/%s.png" % image_name, bbox_inches="tight")
-        plt.close(fig)
-    plt.show()
+    #plot_results(images, image_names, X, Y, Y_pred, all_superpixels,
+                 #folder="figures_train")
+    X_val, Y_val, image_names_val, images_val, all_superpixels_val = load_data(
+        "val", independent=independent)
+    print("score on validation set: %f" % ssvm.score(X_val, Y_val))
+    #Y_pred_val = ssvm.predict(X_val)
+    #plot_results(images_val, image_names_val, X_val, Y_val, Y_pred_val,
+                 #all_superpixels_val, folder="figures_val")
 
     tracer()
 
 
 if __name__ == "__main__":
     main()
+    #plot_parts()
