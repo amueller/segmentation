@@ -52,8 +52,7 @@ def test_learning():
     crf = IgnoreVoidCRF(n_states=3, n_features=2, void_label=2,
                         inference_method='lp')
     ssvm = SubgradientStructuredSVM(crf, verbose=10, C=100, n_jobs=1,
-                                    max_iter=50, learning_rate=0.01,
-                                    batch=False)
+                                    max_iter=50, learning_rate=0.01)
     ssvm.fit(X, Y)
 
     for x in X:
