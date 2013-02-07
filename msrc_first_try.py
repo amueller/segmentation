@@ -83,6 +83,24 @@ def load_data(dataset="train", independent=False):
     return X, Y, image_names, images, all_superpixels
 
 
+def discard_void(X, Y, void_label=21):
+    X_new, Y_new = [], []
+    for x, y in zip(X, Y):
+        features, edges = x
+        mask = y != void_label
+        voids = np.where(y == void_label)[0]
+        edges_new = edges
+        if edges_new.shape[0] > 0:
+            # if there are no edges, don't need to filter them
+            # also, below code would break ;)
+            for void_node in voids:
+                involves_void_node = np.any(edges_new == void_node, axis=1)
+                edges_new = edges_new[~involves_void_node]
+        X_new.append((features[mask], edges_new))
+        Y_new.append(y[mask])
+    return X_new, Y_new
+
+
 def region_graph(regions):
     edges = make_grid_edges(regions)
     n_vertices = regions.size
