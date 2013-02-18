@@ -199,6 +199,34 @@ def plot_parts():
     tracer()
 
 
+def train_car_parts():
+    car_idx = np.where(classes == "car")[0]
+    X, Y, image_names, images, all_superpixels = load_data(
+        "train", independent=False)
+    car_images = np.array([i for i, y in enumerate(Y) if np.any(y == car_idx)])
+    n_states_per_label = np.ones(22, dtype=np.int)
+    n_states_per_label[car_idx] = 6
+
+    X, Y, image_names, images, all_superpixels = zip(*[
+        (X[i], Y[i], image_names[i], images[i], all_superpixels[i])
+        for i in car_images])
+    problem = LatentGraphCRF(n_states_per_label=n_states_per_label,
+                             n_labels=22, inference_method='ad3',
+                             n_features=21 * 6)
+    ssvm = LatentSSVM(problem, verbose=20, C=.10, max_iter=20, n_jobs=-1,
+                      tol=0.0001, show_loss_every=20, base_svm='1-slack',
+                      inference_cache=0, latent_iter=1)
+    ssvm.fit(X, Y)
+    plot_results(images, image_names, X, Y, ssvm.H_init_, all_superpixels,
+                 folder="parts_init", use_colors_predict=False)
+    H = ssvm.predict_latent(X)
+    plot_results(images, image_names, X, Y, H, all_superpixels,
+                 folder="parts_prediction", use_colors_predict=False)
+    H_final = [problem.latent(x, y, ssvm.w) for x, y in zip(X, Y)]
+    plot_results(images, image_names, X, Y, H_final, all_superpixels,
+                 folder="parts_final", use_colors_predict=False)
+    tracer()
+
 def main():
     # load training data
     independent = True
