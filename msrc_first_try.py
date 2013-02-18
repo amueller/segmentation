@@ -88,7 +88,7 @@ def discard_void(X, Y, void_label=21):
     for x, y in zip(X, Y):
         features, edges = x
         mask = y != void_label
-        voids = np.where(y == void_label)[0]
+        voids = np.where(~mask)[0]
         edges_new = edges
         if edges_new.shape[0] > 0:
             # if there are no edges, don't need to filter them
@@ -96,6 +96,12 @@ def discard_void(X, Y, void_label=21):
             for void_node in voids:
                 involves_void_node = np.any(edges_new == void_node, axis=1)
                 edges_new = edges_new[~involves_void_node]
+        reindex_edges = 1000 * np.zeros(len(mask), dtype=np.int)
+        reindex_edges[mask] = np.arange(len(mask))
+        edges_new = reindex_edges[edges_new]
+
+        if np.max(edges_new) > len(features[mask]):
+            tracer()
         X_new.append((features[mask], edges_new))
         Y_new.append(y[mask])
     return X_new, Y_new
@@ -229,10 +235,11 @@ def train_car_parts():
 
 def main():
     # load training data
-    independent = True
+    independent = False
     X, Y, image_names, images, all_superpixels = load_data(
         "train", independent=independent)
-    n_states = 22
+    X, Y = discard_void(X, Y, 21)
+    n_states = 21
     print("number of samples: %s" % len(X))
     #problem = IgnoreVoidCRF(n_states=n_states, n_features=21,
                             #inference_method='qpbo')
