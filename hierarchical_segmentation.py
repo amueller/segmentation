@@ -4,6 +4,7 @@ from scipy.misc import imsave
 from scipy import sparse
 
 from sklearn.cluster import Ward
+#from sklearn.cluster import KMeans
 from skimage.segmentation import mark_boundaries
 
 from msrc_first_try import load_data
@@ -29,17 +30,32 @@ def get_centers(sps):
     return centers
 
 
+def get_km_segments(x, image, sps):
+    feats, edges = x
+    colors = get_colors(image, sps)
+    centers = get_centers(sps)
+    graph = sparse.coo_matrix((np.ones(edges.shape[0]), edges.T))
+    ward = Ward(n_clusters=25, connectivity=graph)
+    #km = KMeans(n_clusters=25)
+    color_feats = np.hstack([colors, centers * 5])
+    return ward.fit_predict(color_feats)
+
+
+def get_segment_features(x, y, image, sps):
+    segments = get_km_segments(x, image, sps)
+    feats = x[0]
+    features = [np.mean(feats[segments == i], axis=0) for i in
+                np.unique(segments)]
+    labels = [np.argmax(np.bincount(y[segments == i])) for i in
+              np.unique(segments)]
+    return segments, features, np.array(labels)
+
+
 def main():
     X, Y, image_names, images, all_superpixels = load_data(
         "train", independent=False)
     for x, name, image, sps in zip(X, image_names, images, all_superpixels):
-        feats, edges = x
-        colors = get_colors(image, sps)
-        centers = get_centers(sps)
-        graph = sparse.coo_matrix((np.ones(edges.shape[0]), edges.T))
-        ward = Ward(n_clusters=25, connectivity=graph)
-        color_feats = np.hstack([colors, centers * 5])
-        segments = ward.fit_predict(color_feats)
+        segments = get_km_segments(x, image, sps)
         boundary_image = mark_boundaries(mark_boundaries(image, sps),
                                          segments[sps], color=[1, 0, 0])
         imsave("hierarchy_sp/%s.png" % name, boundary_image)

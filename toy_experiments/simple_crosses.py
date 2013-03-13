@@ -29,29 +29,30 @@ def main():
         Y_pred = clf.predict(X_)
         score = clf.score(X_, Y_)
         for x, y, h_init, y_pred in zip(X_, Y_, H, Y_pred):
-            fig, ax = plt.subplots(3, 2)
-            ax[0, 0].matshow(y, vmin=0, vmax=crf.n_labels - 1)
-            ax[0, 0].set_title("ground truth")
-            ax[0, 1].matshow(np.argmax(x, axis=-1),
-                             vmin=0, vmax=crf.n_labels - 1)
-            ax[0, 1].set_title("unaries only")
-            if h_init is None:
-                ax[1, 0].set_visible(False)
-            else:
-                ax[1, 0].matshow(h_init, vmin=0, vmax=crf.n_states - 1)
-                ax[1, 0].set_title("latent initial")
-            ax[1, 1].matshow(crf.latent(x, y, clf.w),
-                             vmin=0, vmax=crf.n_states - 1)
-            ax[1, 1].set_title("latent final")
-            ax[2, 0].matshow(crf.inference(x, clf.w), vmin=0, vmax=crf.n_states
-                             - 1)
-            ax[2, 0].set_title("prediction")
-            ax[2, 1].matshow(y_pred, vmin=0, vmax=crf.n_labels - 1)
-            ax[2, 1].set_title("prediction")
+            fig, ax = plt.subplots(4, 1)
+            ax[0].matshow(y, vmin=0, vmax=crf.n_labels - 1)
+            ax[0].set_title("Ground truth")
+            ax[1].matshow(np.argmax(x, axis=-1), vmin=0, vmax=crf.n_labels - 1)
+            ax[1].set_title("Unaries only")
+            #if h_init is None:
+                #ax[1, 0].set_visible(False)
+            #else:
+                #ax[1, 0].matshow(h_init, vmin=0, vmax=crf.n_states - 1)
+                #ax[1, 0].set_title("latent initial")
+            #ax[2].matshow(crf.latent(x, y, clf.w),
+                          #vmin=0, vmax=crf.n_states - 1)
+            #ax[2].set_title("latent final")
+            ax[2].matshow(crf.inference(x, clf.w), vmin=0, vmax=crf.n_states
+                          - 1)
+            ax[2].set_title("Prediction for h")
+            ax[3].matshow(y_pred, vmin=0, vmax=crf.n_labels - 1)
+            ax[3].set_title("Prediction for y")
             for a in ax.ravel():
                 a.set_xticks(())
                 a.set_yticks(())
-            fig.savefig("data_%s_%03d.png" % (name, i), bbox_inches="tight")
+            plt.subplots_adjust(hspace=.5)
+            fig.savefig("data_%s_%03d.png" % (name, i), bbox_inches="tight",
+                        dpi=400)
             i += 1
         print("score %s set: %f" % (name, score))
     print(clf.w)

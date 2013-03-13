@@ -19,6 +19,9 @@ class IgnoreVoidCRF(GraphCRF):
         GraphCRF.__init__(self, n_states, n_features, inference_method)
         self.void_label = void_label
 
+    def max_loss(self, y):
+        return np.sum(y != self.void_label)
+
     def loss(self, y, y_hat):
         # hamming loss:
         return np.sum((y != y_hat)[y != self.void_label])
@@ -35,6 +38,7 @@ class IgnoreVoidCRF(GraphCRF):
             # for each class, decrement features
             # for loss-agumention
             unary_potentials[(y != l) * (y != self.void_label), l] += 1.
+            unary_potentials[:, l] += 1. / y.size
         return inference_dispatch(unary_potentials, pairwise_potentials, edges,
                                   self.inference_method, relaxed=relaxed,
                                   return_energy=return_energy)
@@ -43,4 +47,5 @@ class IgnoreVoidCRF(GraphCRF):
         # continuous version of the loss
         # y is the result of linear programming
         mask = y != self.void_label
-        return GraphCRF.continuous_loss(self, y[mask], y_hat[mask])
+        return (GraphCRF.continuous_loss(self, y[mask], y_hat[mask])
+                + np.sum(y_hat == self.void_label) / y.size)
