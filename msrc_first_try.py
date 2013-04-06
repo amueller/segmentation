@@ -14,30 +14,19 @@ from pystruct.utils import make_grid_edges
 from pystruct import learners
 from pystruct.problems.latent_graph_crf import kmeans_init
 from pystruct.problems import GraphCRF, LatentGraphCRF
+from pystruct.utils import SaveLogger
+
+from datasets.msrc import MSRCDataset
+from msrc_helpers import classes, DataBunch, plot_results, discard_void
 
 #from ignore_void_crf import IgnoreVoidCRF
 
 from IPython.core.debugger import Tracer
 tracer = Tracer()
 
-memory = Memory(cachedir="cache")
+memory = Memory(cachedir="/tmp/cache")
 
-colors = np.array(
-    [[128, 0, 0], [0, 128, 0], [128, 128, 0], [0, 0, 128],
-     # [128, 0, 128], horse
-     [0, 128, 128], [128, 128, 128],
-     # [64, 0, 0], mountain
-     [192, 0, 0], [64, 128, 0], [192, 128, 0], [64, 0, 128],
-     [192, 0, 128], [64, 128, 128], [192, 128, 128], [0, 64, 0],
-     [128, 64, 0], [0, 192, 0], [128, 64, 128], [0, 192, 128],
-     [128, 192, 128], [64, 64, 0], [192, 64, 0], [0, 0, 0]])
-
-classes = np.array(['building', 'grass', 'tree', 'cow', 'sheep', 'sky',
-                    'aeroplane', 'water', 'face', 'car', 'bicycle', 'flower',
-                    'sign', 'bird', 'book', 'chair', 'road', 'cat', 'dog',
-                    'body', 'boat', 'void', 'mountain', 'horse'])
-
-base_path = "/home/VI/staff/amueller/datasets/aurelien_msrc_features/msrc/"
+base_path = "/home/user/amueller/datasets/aurelien_msrc_features/msrc/"
 
 
 @memory.cache
@@ -51,14 +40,14 @@ def load_data(dataset="train", independent=False):
         raise ValueError("dataset must be one of 'train', 'val', 'test',"
                          " got %s" % dataset)
     ds_path = base_path + ds_dict[dataset]
-    image_names, images, all_superpixels = [], [], []
+    file_names, images, all_superpixels = [], [], []
     X, Y = [], []
     for f in glob(ds_path + "/*.dat"):
         name = os.path.basename(f).split('.')[0]
         img = imread("%s/%s.bmp" % (ds_path, name))
         labels = np.loadtxt(base_path + "labels/%s.txt" % name, dtype=np.int)
         images.append(img)
-        image_names.append(name)
+        file_names.append(name)
         # features
         feat = np.hstack([np.loadtxt("%s/%s.local%s" % (ds_path, name, i)) for
                           i in xrange(1, 7)])
@@ -77,31 +66,8 @@ def load_data(dataset="train", independent=False):
         labels[labels == mountain_idx] = void_idx
         labels[labels == horse_idx] = void_idx
         Y.append(labels)
-    return X, Y, image_names, images, all_superpixels
-
-
-def discard_void(X, Y, void_label=21):
-    X_new, Y_new = [], []
-    for x, y in zip(X, Y):
-        features, edges = x
-        mask = y != void_label
-        voids = np.where(~mask)[0]
-        edges_new = edges
-        if edges_new.shape[0] > 0:
-            # if there are no edges, don't need to filter them
-            # also, below code would break ;)
-            for void_node in voids:
-                involves_void_node = np.any(edges_new == void_node, axis=1)
-                edges_new = edges_new[~involves_void_node]
-        reindex_edges = 1000 * np.zeros(len(mask), dtype=np.int)
-        reindex_edges[mask] = np.arange(len(mask))
-        edges_new = reindex_edges[edges_new]
-
-        if np.max(edges_new) > len(features[mask]):
-            tracer()
-        X_new.append((features[mask], edges_new))
-        Y_new.append(y[mask])
-    return X_new, Y_new
+    data = DataBunch(X, Y, file_names, images, all_superpixels)
+    return data
 
 
 def region_graph(regions):
@@ -146,76 +112,38 @@ def plot_confusion_matrix(matrix, title=None):
         plt.title(title)
 
 
-def plot_results(images, image_names, Y, Y_pred, all_superpixels,
-                 folder="figures", use_colors_predict=True):
-    if not os.path.exists(folder):
-        os.mkdir(folder)
-    import matplotlib.colors as cl
-    np.random.seed(0)
-    random_colormap = cl.ListedColormap(np.random.uniform(size=(100, 3)))
-    for image, image_name, superpixels, y, y_pred in zip(images, image_names,
-                                                         all_superpixels, Y,
-                                                         Y_pred):
-        fig, axes = plt.subplots(1, 4, figsize=(12, 3))
-        axes[0].imshow(image)
-        axes[1].set_title("ground truth")
-        axes[1].imshow(image)
-        axes[1].imshow(colors[y[superpixels]], vmin=0, vmax=23, alpha=.7)
-        axes[2].set_title("prediction")
-        axes[2].imshow(image)
-        if use_colors_predict:
-            axes[2].imshow(colors[y_pred[superpixels]], vmin=0, vmax=23,
-                           alpha=.7)
-        else:
-            vmax = np.max(np.hstack(Y_pred))
-            axes[2].imshow(y_pred[superpixels], vmin=0, vmax=vmax, alpha=.9,
-                           cmap=random_colormap)
-        if use_colors_predict:
-            present_y = np.unique(np.hstack([y, y_pred]))
-        else:
-            present_y = np.unique(y)
-        axes[3].imshow(colors[present_y, :][:, np.newaxis, :],
-                       interpolation='nearest')
-        for i, c in enumerate(present_y):
-            axes[3].text(1, i, classes[c])
-        for ax in axes.ravel():
-            ax.set_xticks(())
-            ax.set_yticks(())
-        fig.savefig(folder + "/%s.png" % image_name, bbox_inches="tight")
-        plt.close(fig)
-
-
 def plot_parts():
     car_idx = np.where(classes == "car")[0]
-    X, Y, image_names, images, all_superpixels = load_data(
-        "train", independent=False)
-    car_images = np.array([i for i, y in enumerate(Y) if np.any(y == car_idx)])
-    flat_X = [x[0] for x in X]
-    edges = [[x[1]] for x in X]
+    data = load_data("train", independent=False)
+    car_images = np.array([i for i, y in enumerate(data.Y)
+                           if np.any(y == car_idx)])
+    flat_X = [x[0] for x in data.X]
+    edges = [[x[1]] for x in data.X]
     n_states_per_label = np.ones(22, dtype=np.int)
     n_states_per_label[car_idx] = 6
 
-    H = kmeans_init(flat_X, Y, edges, n_labels=22,
+    H = kmeans_init(flat_X, data.Y, edges, n_labels=22,
                     n_states_per_label=n_states_per_label, symmetric=True)
-    X, Y, image_names, images, all_superpixels, H = zip(*[
-        (X[i], Y[i], image_names[i], images[i], all_superpixels[i], H[i])
+    X, Y, file_names, images, all_superpixels, H = zip(*[
+        (data.X[i], data.Y[i], data.file_names[i], data.images[i],
+         data.all_superpixels[i], H[i])
         for i in car_images])
-    plot_results(images, image_names, Y, H, all_superpixels,
+    plot_results(images, file_names, Y, H, all_superpixels,
                  folder="test_parts", use_colors_predict=False)
     tracer()
 
 
 def train_car_parts():
     car_idx = np.where(classes == "car")[0]
-    X, Y, image_names, images, all_superpixels = load_data(
-        "train", independent=False)
-    car_images = np.array([i for i, y in enumerate(Y) if np.any(y == car_idx)])
+    data = load_data("train", independent=False)
+    car_images = np.array([i for i, y in enumerate(data.Y)
+                           if np.any(y == car_idx)])
     n_states_per_label = np.ones(22, dtype=np.int)
     n_states_per_label[car_idx] = 6
 
-    X, Y, image_names, images, all_superpixels = zip(*[
-        (X[i], Y[i], image_names[i], images[i], all_superpixels[i])
-        for i in car_images])
+    X, Y, file_names, images, all_superpixels = zip(*[
+        (data.X[i], data.Y[i], data.file_names[i], data.images[i],
+         data.all_superpixels[i]) for i in car_images])
     problem = LatentGraphCRF(n_states_per_label=n_states_per_label,
                              n_labels=22, inference_method='ad3',
                              n_features=21 * 6)
@@ -224,27 +152,28 @@ def train_car_parts():
         show_loss_every=10, base_svm='subgradient', inference_cache=50,
         latent_iter=5, learning_rate=0.001, decay_exponent=0.5)
     ssvm.fit(X, Y)
-    plot_results(images, image_names, Y, ssvm.H_init_, all_superpixels,
+    plot_results(images, file_names, Y, ssvm.H_init_, all_superpixels,
                  folder="parts_init", use_colors_predict=False)
     H = ssvm.predict_latent(X)
-    plot_results(images, image_names, Y, H, all_superpixels,
+    plot_results(images, file_names, Y, H, all_superpixels,
                  folder="parts_prediction", use_colors_predict=False)
     H_final = [problem.latent(x, y, ssvm.w) for x, y in zip(X, Y)]
-    plot_results(images, image_names, Y, H_final, all_superpixels,
+    plot_results(images, file_names, Y, H_final, all_superpixels,
                  folder="parts_final", use_colors_predict=False)
     tracer()
 
 
 def train_car():
     car_idx = np.where(classes == "car")[0]
-    X, Y, image_names, images, all_superpixels = load_data(
-        "train", independent=False)
-    car_images = np.array([i for i, y in enumerate(Y) if np.any(y == car_idx)])
+    data_train = load_data("train", independent=False)
+    car_images = np.array([i for i, y in enumerate(data_train.Y)
+                           if np.any(y == car_idx)])
     n_states_per_label = np.ones(22, dtype=np.int)
     n_states_per_label[car_idx] = 6
 
-    X, Y, image_names, images, all_superpixels = zip(*[
-        (X[i], Y[i], image_names[i], images[i], all_superpixels[i])
+    X, Y, file_names, images, all_superpixels = zip(*[
+        (data_train.X[i], data_train.Y[i], data_train.file_names[i],
+         data_train.images[i], data_train.superpixels[i])
         for i in car_images])
     problem = GraphCRF(n_states=22, inference_method='ad3', n_features=21 * 6)
     ssvm = learners.SubgradientStructuredSVM(
@@ -252,18 +181,18 @@ def train_car():
         show_loss_every=10, learning_rate=0.0001, decay_exponent=0.5)
     ssvm.fit(X, Y)
     Y_pred = ssvm.predict(X)
-    plot_results(images, image_names, Y, Y_pred, all_superpixels,
+    plot_results(images, file_names, Y, Y_pred, all_superpixels,
                  folder="cars_only")
 
-    X_val, Y_val, image_names_val, images_val, all_superpixels_val = \
-        load_data("val", independent=False)
-    car_images_val = np.array([i for i, y in enumerate(Y_val)
+    data_val = load_data("val", independent=False)
+    car_images_val = np.array([i for i, y in enumerate(data_val.Y)
                                if np.any(y == car_idx)])
-    X_val, Y_val, image_names_val, images_val, all_superpixels_val = \
-        zip(*[(X_val[i], Y_val[i], image_names_val[i], images_val[i],
-               all_superpixels_val[i]) for i in car_images_val])
+    X_val, Y_val, file_names_val, images_val, all_superpixels_val = \
+        zip(*[(data_val.X[i], data_val.Y[i], data_val.file_names[i],
+               data_val.images[i], data_val.superpixels[i]) for i in
+              car_images_val])
     Y_pred_val = ssvm.predict(X_val)
-    plot_results(images_val, image_names_val, Y_val, Y_pred_val,
+    plot_results(images_val, file_names_val, Y_val, Y_pred_val,
                  all_superpixels_val, folder="cars_only_val")
     # C=10
     ## train:
@@ -274,39 +203,83 @@ def train_car():
     tracer()
 
 
+def eval_on_pixels(data, sp_predictions):
+    """Evaluate segmentation performance on pixel level.
+
+    Parameters
+    ----------
+    data : DataBunch Named tuple
+        Contains images, superpixels, descriptors and filenames.
+
+    sp_predictions : list of arrays
+        For each image, list of labels per superpixel
+
+    """
+    msrc = MSRCDataset()
+    confusion = np.zeros((22, 22))
+    for y, sp, f in zip(sp_predictions, data.superpixels, data.file_names):
+        # load ground truth image
+        gt = msrc.get_ground_truth(f)
+        gt = gt - 1
+        gt[gt == 255] == 21
+        prediction = y[sp]
+        confusion += confusion_matrix(gt.ravel(), prediction.ravel(),
+                                      labels=np.arange(0, 22))
+
+    confusion_normalized = (confusion.astype(np.float) /
+                            confusion.sum(axis=1)[:, np.newaxis])
+    tracer()
+    return confusion, confusion_normalized
+
+
+def train_svm():
+    data_train = load_data("train", independent=True)
+    X_features = [x[0] for x in data_train.X]
+    X_features_flat = np.vstack(X_features)
+    y = np.hstack(data_train.Y)
+    from sklearn.linear_model import SGDClassifier
+    svm = SGDClassifier()
+    svm.fit(X_features_flat[y != 21], y[y != 21])
+
+    #eval_on_pixels(data_train, [svm.predict(x) for x in X_features])
+
+    plot_results(data_train, [svm.predict(x) for x in X_features],
+                 folder="blub")
+
+    Tracer()()
+
+
 def main():
     # load training data
     independent = False
-    X, Y, image_names, images, all_superpixels = load_data(
-        "train", independent=independent)
-    X_, Y_ = discard_void(X, Y, 21)
+    data_train = load_data("train", independent=independent)
+    X_, Y_ = discard_void(data_train.X, data_train.Y, 21)
     n_states = 21
-    print("number of samples: %s" % len(X))
+    print("number of samples: %s" % len(data_train.X))
     problem = GraphCRF(n_states=n_states, n_features=21 * 6,
-                       inference_method='qpbo')
-    # 80% on training set with C=100, lr=0.000001, max_iter=100
-    # score on training set: 0.843112 with ignoreVoidCRF, max_iter=100
-    # score on training set: 0.850884 with C=100, max_iter=100, pairwise.
-    # careful! not really the right measure :-/
-    # val:0.78365315031101435
-    # OneSlack, C=10, max_iter=200, score on training set: 0.689209
-    ssvm = learners.SubgradientStructuredSVM(
-        problem, verbose=2, C=.001, n_jobs=-1, max_iter=100000,
-        learning_rate=0.00015, show_loss_every=10, decay_exponent=.5,
-        momentum=0.98)
-    #ssvm = learners.OneSlackSSVM(problem, verbose=2, C=100, max_iter=5000,
-                                 #n_jobs=-1, tol=0.0001, show_loss_every=20,
-                                 #inference_cache=50)
-    #ssvm.w = np.load("pairwise_w.npy")
+                       inference_method='ad3')
+    #ssvm = learners.SubgradientStructuredSVM(
+        #problem, verbose=2, C=.001, n_jobs=-1, max_iter=100000,
+        #learning_rate=0.00015, show_loss_every=10, decay_exponent=.5,
+        #momentum=0.98)
+    ssvm = learners.OneSlackSSVM(
+        problem, verbose=2, C=0.001, max_iter=100000, n_jobs=-1, tol=0.0001,
+        show_loss_every=200, inference_cache=50,
+        logger=SaveLogger("graph_ad3_0.0001_2.pickle", save_every=100),
+        inactive_threshold=1e-5, break_on_bad=False)
+    #ssvm = SaveLogger(file_name="graph_qpbo_0.001_3.pickle").load()
+    #ssvm.logger = SaveLogger(file_name="graph_qpbo_0.001_3_refit.pickle")
+    #ssvm.fit(X_, Y_, warm_start=True)
     ssvm.fit(X_, Y_)
     print("fit finished!")
+    tracer()
 
     # do some evaluation on the training set
     print("score on training set: %f" % ssvm.score(X_, Y_))
-    Y_pred = ssvm.predict(X)
+    Y_pred = ssvm.predict(data_train.X)
     # compute confusion matrix
     confusion = np.zeros((n_states, n_states))
-    for y, y_pred in zip(Y, Y_pred):
+    for y, y_pred in zip(data_train.Y, Y_pred):
         confusion += confusion_matrix(y, y_pred, labels=np.arange(n_states))
     plot_confusion_matrix(confusion, title="confusion")
 
@@ -320,20 +293,19 @@ def main():
     plt.show()
 
     # make figures with predictions
-    plot_results(images, image_names, Y, Y_pred, all_superpixels,
-                 folder="figures_train")
-    X_val, Y_val, image_names_val, images_val, all_superpixels_val = load_data(
-        "val", independent=independent)
-    X_val_, Y_val_ = discard_void(X_val, Y_val, 21)
+    #plot_results(data_train.images, data_train.file_names, data_train.Y,
+                 #Y_pred, data_train.all_superpixels, folder="figures_train")
+    data_val = load_data("val", independent=independent)
+    X_val_, Y_val_ = discard_void(data_val.X, data_val.Y, 21)
     print("score on validation set: %f" % ssvm.score(X_val_, Y_val_))
-    Y_pred_val = ssvm.predict(X_val)
-    plot_results(images_val, image_names_val, Y_val, Y_pred_val,
-                 all_superpixels_val, folder="figures_val")
+    Y_pred_val = ssvm.predict(data_val.X)
+    plot_results(data_val, Y_pred_val, folder="figures_val")
     tracer()
 
 
 if __name__ == "__main__":
     main()
+    #train_svm()
     #plot_parts()
     #train_car_parts()
     #train_car()

@@ -3,11 +3,15 @@ import numpy as np
 from scipy.misc import imsave
 from scipy import sparse
 
-from sklearn.cluster import Ward
-#from sklearn.cluster import KMeans
+#from sklearn.cluster import Ward
+from sklearn.cluster import KMeans
+from sklearn.externals.joblib import Memory
 from skimage.segmentation import mark_boundaries
 
 from msrc_first_try import load_data
+
+
+memory = Memory(cachedir="/tmp/cache")
 
 
 def get_colors(img, sps):
@@ -34,21 +38,34 @@ def get_km_segments(x, image, sps):
     feats, edges = x
     colors = get_colors(image, sps)
     centers = get_centers(sps)
-    graph = sparse.coo_matrix((np.ones(edges.shape[0]), edges.T))
-    ward = Ward(n_clusters=25, connectivity=graph)
-    #km = KMeans(n_clusters=25)
-    color_feats = np.hstack([colors, centers * 5])
-    return ward.fit_predict(color_feats)
+    #graph = sparse.coo_matrix((np.ones(edges.shape[0]), edges.T))
+    #ward = Ward(n_clusters=25, connectivity=graph)
+    km = KMeans(n_clusters=25)
+    color_feats = np.hstack([colors, centers * 2])
+    return km.fit_predict(color_feats)
 
 
+@memory.cache
 def get_segment_features(x, y, image, sps):
     segments = get_km_segments(x, image, sps)
-    feats = x[0]
+    feats, edges = x
+    segment_edges = segments[edges]
+    # make direction of edges unique
+    segment_edges = np.sort(segment_edges, axis=1)
+    # to get rid of duplicate edges, self edges, become sparse matrix
+    graph = sparse.coo_matrix((np.ones(segment_edges.shape[0]),
+                               segment_edges.T))
+    # conversion removes duplicates
+    graph = graph.tocsr()
+    # remove self edges at diag
+    graph.setdiag(np.zeros(graph.shape[0]))
+    segment_edges = np.vstack(graph.nonzero()).T
+
     features = [np.mean(feats[segments == i], axis=0) for i in
                 np.unique(segments)]
     labels = [np.argmax(np.bincount(y[segments == i])) for i in
               np.unique(segments)]
-    return segments, features, np.array(labels)
+    return segments, features, np.array(labels), edges
 
 
 def main():
