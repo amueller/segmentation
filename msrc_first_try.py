@@ -221,30 +221,56 @@ def eval_on_pixels(data, sp_predictions):
         # load ground truth image
         gt = msrc.get_ground_truth(f)
         gt = gt - 1
-        gt[gt == 255] == 21
+        gt[gt == 255] = 21
         prediction = y[sp]
         confusion += confusion_matrix(gt.ravel(), prediction.ravel(),
                                       labels=np.arange(0, 22))
-
+    # drop void
+    confusion = confusion[:-1, :-1]
     confusion_normalized = (confusion.astype(np.float) /
                             confusion.sum(axis=1)[:, np.newaxis])
-    tracer()
-    return confusion, confusion_normalized
+    per_class_acc = np.diag(confusion_normalized)
+    global_acc = np.diag(confusion).sum() / confusion.sum()
+    average_acc = np.mean(per_class_acc)
+    return {'global': global_acc, 'average': average_acc,
+            'per_class': per_class_acc, 'confusion': confusion}
 
 
-def train_svm():
+def train_svm(test=False):
     data_train = load_data("train", independent=True)
     X_features = [x[0] for x in data_train.X]
     X_features_flat = np.vstack(X_features)
     y = np.hstack(data_train.Y)
-    from sklearn.linear_model import SGDClassifier
-    svm = SGDClassifier()
+    if test:
+        data_val = load_data("val", independent=True)
+        X_features_val = [x[0] for x in data_val.X]
+        X_features_flat_val = np.vstack(X_features_val)
+        y_val = np.hstack(data_val.Y)
+        y = np.hstack([y, y_val])
+        X_features_flat = np.vstack([X_features_flat, X_features_flat_val])
+    tracer()
+    from sklearn.svm import LinearSVC
+    svm = LinearSVC(C=0.0001, class_weight='auto', dual=False)
     svm.fit(X_features_flat[y != 21], y[y != 21])
 
-    #eval_on_pixels(data_train, [svm.predict(x) for x in X_features])
+    results = eval_on_pixels(data_train, [svm.predict(x) for x in X_features])
+    print("global: %f, average: %f" % (results['global'], results['average']))
+    print(["%s: %.2f" % (c, x) for c, x in zip(classes, results['per_class'])])
 
-    plot_results(data_train, [svm.predict(x) for x in X_features],
-                 folder="blub")
+    if test:
+        data_test = load_data("test", independent=True)
+    else:
+        data_test = load_data("val", independent=True)
+
+    X_features = [x[0] for x in data_test.X]
+    X_features_flat = np.vstack(X_features)
+    y = np.hstack(data_test.Y)
+    results = eval_on_pixels(data_test, [svm.predict(x) for x in X_features])
+    print("global: %f, average: %f" % (results['global'], results['average']))
+    print(["%s: %.2f" % (c, x) for c, x in zip(classes, results['per_class'])])
+
+    #plot_results(data_train, [svm.predict(x) for x in X_features],
+                 #folder="blub")
 
     Tracer()()
 
