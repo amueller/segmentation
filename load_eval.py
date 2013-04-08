@@ -22,7 +22,11 @@ def main():
                                    ["TRAINING SET", "VALIDATION SET"]):
             print(title)
             data = load_data(data_str)
-            results = eval_on_pixels(data, ssvm.predict(data.X))
+            Y_pred = ssvm.predict(data.X)
+            Y_flat = np.hstack(data.Y)
+            print("superpixel accuracy: %s"
+                  % np.mean((np.hstack(Y_pred) == Y_flat)[Y_flat != 21]))
+            results = eval_on_pixels(data, Y_pred)
             print("global: %f, average: %f"
                   % (results['global'], results['average']))
             print(["%s: %.2f" % (c, x)
