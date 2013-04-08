@@ -11,7 +11,7 @@ from skimage.segmentation import mark_boundaries
 from msrc_first_try import load_data
 
 
-memory = Memory(cachedir="/tmp/cache")
+memory = Memory(cachedir="/tmp/cache", verbose=0)
 
 
 def get_colors(img, sps):
