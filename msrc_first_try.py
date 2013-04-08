@@ -279,11 +279,15 @@ def main():
     # load training data
     independent = False
     data_train = load_data("train", independent=independent)
+    #X_, Y_ = data_train.X, data_train.Y
     X_, Y_ = discard_void(data_train.X, data_train.Y, 21)
     n_states = 21
     print("number of samples: %s" % len(data_train.X))
+    class_weights = 1. / np.bincount(np.hstack(Y_))
+    class_weights[-1] = 0
+    class_weights /= np.sum(class_weights)
     problem = GraphCRF(n_states=n_states, n_features=21 * 6,
-                       inference_method='ad3')
+                       inference_method='qpbo', class_weight=class_weights)
     #ssvm = learners.SubgradientStructuredSVM(
         #problem, verbose=2, C=.001, n_jobs=-1, max_iter=100000,
         #learning_rate=0.00015, show_loss_every=10, decay_exponent=.5,
@@ -291,12 +295,17 @@ def main():
     ssvm = learners.OneSlackSSVM(
         problem, verbose=2, C=0.001, max_iter=100000, n_jobs=-1, tol=0.0001,
         show_loss_every=200, inference_cache=50,
-        logger=SaveLogger("graph_ad3_0.0001_2.pickle", save_every=100),
+        logger=SaveLogger("graph_qpbo_0.0001_class_weights.pickle",
+                          save_every=100),
         inactive_threshold=1e-5, break_on_bad=False)
-    #ssvm = SaveLogger(file_name="graph_qpbo_0.001_3.pickle").load()
-    #ssvm.logger = SaveLogger(file_name="graph_qpbo_0.001_3_refit.pickle")
-    #ssvm.fit(X_, Y_, warm_start=True)
-    ssvm.fit(X_, Y_)
+    ssvm = SaveLogger(file_name="graph_qpbo_0.001_3_refit2.pickle").load()
+    ssvm.logger = SaveLogger(file_name="graph_qpbo_0.001_3_refit3.pickle",
+                             save_every=50)
+    ssvm.problem.class_weight = np.ones(ssvm.problem.n_states)
+    ssvm.problem.inference_method = 'ad3'
+    #ssvm.inference_cache = 0
+    ssvm.fit(X_, Y_, warm_start=True)
+    #ssvm.fit(X_, Y_)
     print("fit finished!")
     tracer()
 
