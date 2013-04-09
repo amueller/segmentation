@@ -37,6 +37,8 @@ def main():
         axes[0].plot(ssvm.objective_curve_)
         axes[0].plot(ssvm.primal_objective_curve_)
         inference_run = ~np.array(ssvm.cached_constraint_)
+        # if we pressed ctrl+c in a bad moment
+        inference_run = inference_run[:len(ssvm.objective_curve_)]
         axes[1].plot(np.array(ssvm.objective_curve_)[inference_run])
         axes[1].plot(np.array(ssvm.primal_objective_curve_)[inference_run])
         plt.show()
