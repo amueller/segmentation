@@ -6,7 +6,7 @@ from scipy import sparse
 
 from hierarchical_segmentation import get_segment_features
 
-from msrc_first_try import load_data, discard_void
+from msrc_first_try import load_data
 
 #from sklearn.grid_search import GridSearchCV
 
@@ -43,14 +43,14 @@ def make_hierarchical_data(data, lateral=False, latent=False):
     all_edges = make_hierarchy_edges(all_segments, data.superpixels)
 
     if latent:
-        X_stacked = [(np.vstack([x[0], feat]),
-                      np.vstack([x[1], edges] if lateral else edges))
+        X_stacked = [(x[0],
+                      np.vstack([x[1], edges] if lateral else edges),
+                      len(feat))
                      for x, feat, edges in zip(data.X, all_features,
                                                all_edges)]
     else:
         X_stacked = [(np.vstack([x[0], feat]),
-                      np.vstack([x[1], edges] if lateral else edges),
-                      feat.shape[0])
+                      np.vstack([x[1], edges] if lateral else edges))
                      for x, feat, edges in zip(data.X, all_features,
                                                all_edges)]
 
@@ -64,24 +64,23 @@ def svm_on_segments():
     lateral = False
     latent = True
     data_train = load_data("train", independent=False)
-    X_stacked, Y_stacked = make_hierarchical_data(data_train, lateral=lateral,
-                                                  latent=latent)
-    X_, Y_ = discard_void(X_stacked, Y_stacked, 21)
-    X_org_, Y_org_ = discard_void(data_train.X, data_train.Y, 21)
-    if lateral:
-        X_org_ = [(x[0], np.empty((0, 2), dtype=np.int)) for x in X_org_]
+    X_, Y_ = make_hierarchical_data(data_train, lateral=lateral, latent=latent)
+    X_org_ = data_train.X
+    # remove edges
+    if not lateral:
+        X_org_ = [(x[0], np.zeros((0, 2), dtype=np.int)) for x in X_org_]
 
     n_states = 21
 
     if latent:
-        problem = LatentNodeCRF(n_states=n_states, n_features=21 * 6,
+        problem = LatentNodeCRF(n_labels=n_states, n_features=21 * 6,
+                                n_hidden_states=2,
                                 inference_method='qpbo' if lateral else 'dai')
         logger = SaveLogger("hierarchy_lateral_0.0001.pickle", save_every=100)
-        ssvm = learners.LatentSSVM(
+        ssvm = learners.LatentSSVM(learners.OneSlackSSVM(
             problem, verbose=2, C=0.0001, max_iter=100000, n_jobs=-1,
             tol=0.0001, show_loss_every=200, inference_cache=50, logger=logger,
-            cache_tol='auto', inactive_threshold=1e-5, break_on_bad=False,
-            base_svm='1-slack')
+            cache_tol='auto', inactive_threshold=1e-5, break_on_bad=False))
     else:
         problem = GraphCRF(n_states=n_states, n_features=21 * 6,
                            inference_method='qpbo' if lateral else 'dai')
@@ -100,23 +99,19 @@ def svm_on_segments():
 
     # do some evaluation on the training set
     print("score on augmented training set: %f" % ssvm.score(X_, Y_))
-    # remove edges
-    X_org_ = [(x[0], np.zeros((0, 2), dtype=np.int)) for x in X_org_]
-    print("score on original training set: %f" % ssvm.score(X_org_, Y_org_))
+    print("score on original training set: %f" % ssvm.score(X_org_,
+                                                            data_train.Y))
 
     data_val = load_data("val", independent=False)
-
-    X_val_org, Y_val_org = discard_void(data_val.X, data_val.Y, 21)
-
-    if lateral:
+    X_val_org = data_val.X
+    if not lateral:
         X_val_org = [(x[0], np.empty((0, 2), dtype=np.int)) for x in X_val_org]
+
     print("score on original validation set: %f"
-          % ssvm.score(X_val_org, Y_val_org))
+          % ssvm.score(X_val_org, data_val.Y))
     # load and prepare data
-    X_stacked_val, Y_stacked_val = make_hierarchical_data(data_val,
-                                                          lateral=lateral,
-                                                          latent=latent)
-    X_val_, Y_val_ = discard_void(X_stacked_val, Y_stacked_val, 21)
+    X_val_, Y_val_ = make_hierarchical_data(data_val, lateral=lateral,
+                                            latent=latent)
 
     print("validation score on augmented validation set: %f"
           % ssvm.score(X_val_, Y_val_))
