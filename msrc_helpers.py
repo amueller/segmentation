@@ -27,9 +27,9 @@ DataBunch = namedtuple('DataBunch', 'X, Y, file_names, images, superpixels')
 def plot_results(data, Y_pred, folder="figures", use_colors_predict=True):
     if not os.path.exists(folder):
         os.mkdir(folder)
+    msrc = MSRCDataset()
     import matplotlib.colors as cl
     np.random.seed(0)
-    msrc = MSRCDataset()
     random_colormap = cl.ListedColormap(np.random.uniform(size=(100, 3)))
     for image, image_name, superpixels, y, y_pred in zip(data.images,
                                                          data.file_names,
@@ -74,9 +74,15 @@ def plot_results(data, Y_pred, folder="figures", use_colors_predict=True):
 def discard_void(X, Y, void_label=21):
     X_new, Y_new = [], []
     for x, y in zip(X, Y):
-        features, edges = x
         mask = y != void_label
         voids = np.where(~mask)[0]
+
+        if len(x) == 2:
+            features, edges = x
+        else:
+            features, edges, n_hidden = x
+            mask = np.hstack([mask, np.ones(n_hidden, dtype=np.bool)])
+
         edges_new = edges
         if edges_new.shape[0] > 0:
             # if there are no edges, don't need to filter them
@@ -84,10 +90,16 @@ def discard_void(X, Y, void_label=21):
             for void_node in voids:
                 involves_void_node = np.any(edges_new == void_node, axis=1)
                 edges_new = edges_new[~involves_void_node]
-        reindex_edges = 1000 * np.zeros(len(mask), dtype=np.int)
-        reindex_edges[mask] = np.arange(len(mask))
-        edges_new = reindex_edges[edges_new]
 
-        X_new.append((features[mask], edges_new))
-        Y_new.append(y[mask])
+        reindex_edges = np.zeros(len(mask), dtype=np.int)
+        reindex_edges[mask] = np.arange(np.sum(mask))
+        edges_new = reindex_edges[edges_new]
+        if len(x) == 2:
+            X_new.append((features[mask], edges_new))
+            Y_new.append(y[mask])
+        else:
+            n_hidden_new = np.max(edges_new) - np.sum(mask[:-n_hidden]) + 1
+            X_new.append((features[mask[:-n_hidden]], edges_new, n_hidden_new))
+            Y_new.append(y[mask[:-n_hidden]])
+
     return X_new, Y_new
