@@ -1,5 +1,7 @@
+import os
+
 import numpy as np
-#import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
 from scipy.misc import imsave
 from scipy import sparse
 
@@ -9,6 +11,7 @@ from sklearn.externals.joblib import Memory
 from skimage.segmentation import mark_boundaries
 
 from msrc_first_try import load_data
+from msrc_helpers import MSRCDataset, colors, classes
 
 
 memory = Memory(cachedir="/tmp/cache", verbose=0)
@@ -36,12 +39,12 @@ def get_centers(sps):
 
 def get_km_segments(x, image, sps):
     feats, edges = x
-    colors = get_colors(image, sps)
+    colors_ = get_colors(image, sps)
     centers = get_centers(sps)
     #graph = sparse.coo_matrix((np.ones(edges.shape[0]), edges.T))
     #ward = Ward(n_clusters=25, connectivity=graph)
     km = KMeans(n_clusters=25)
-    color_feats = np.hstack([colors, centers * 2])
+    color_feats = np.hstack([colors_, centers * 2])
     return km.fit_predict(color_feats)
 
 
@@ -66,6 +69,53 @@ def get_segment_features(x, y, image, sps):
     labels = [np.argmax(np.bincount(y[segments == i])) for i in
               np.unique(segments)]
     return segments, features, np.array(labels), edges
+
+
+def plot_results_hierarchy(data, Y_pred, folder="figures",
+                           use_colors_predict=True):
+    if not os.path.exists(folder):
+        os.mkdir(folder)
+    msrc = MSRCDataset()
+    import matplotlib.colors as cl
+    np.random.seed(0)
+    random_colormap = cl.ListedColormap(np.random.uniform(size=(100, 3)))
+    for stuff in zip(data.images, data.file_names, data.superpixels,
+                     data.segments, data.Y, Y_pred):
+        image, image_name, superpixels, segments, y, y_pred = stuff
+        h = y_pred[len(y):]
+        fig, axes = plt.subplots(2, 3, figsize=(12, 6))
+
+        axes[0, 0].imshow(image)
+        axes[0, 1].set_title("ground truth")
+        axes[0, 1].imshow(image)
+        gt = msrc.get_ground_truth(image_name)
+        gt = gt - 1
+        gt[gt == 255] = 21
+        axes[0, 1].imshow(colors[gt], alpha=.7)
+        axes[1, 0].set_title("sp ground truth")
+        axes[1, 0].imshow(image)
+        axes[1, 0].imshow(colors[y[superpixels]], vmin=0, vmax=23, alpha=.7)
+
+        axes[1, 1].set_title("prediction")
+        axes[1, 1].imshow(image)
+        axes[1, 1].imshow(colors[y_pred[superpixels]], vmin=0, vmax=23,
+                          alpha=.7)
+        present_y = np.unique(y)
+
+        vmax = np.max(np.hstack(Y_pred))
+        vmin = np.min(np.hstack(Y_pred))
+        axes[1, 2].imshow(h[segments], vmin=vmin, vmax=vmax, alpha=.9,
+                          cmap=random_colormap)
+
+        axes[0, 2].imshow(colors[present_y, :][:, np.newaxis, :],
+                          interpolation='nearest')
+        for i, c in enumerate(present_y):
+            axes[0, 2].text(1, i, classes[c])
+        for ax in axes.ravel():
+            ax.set_xticks(())
+            ax.set_yticks(())
+        fig.savefig(folder + "/%s.png" % image_name, bbox_inches="tight")
+        plt.close(fig)
 
 
 def main():
