@@ -6,9 +6,11 @@ import numpy as np
 #from sklearn.metrics import confusion_matrix
 
 from pystruct.utils import SaveLogger
+from pystruct.problems import LatentNodeCRF
 
 from msrc_first_try import eval_on_pixels, load_data
 from msrc_helpers import classes
+from hierarchical_crf import make_hierarchical_data
 
 
 def main():
@@ -35,11 +37,17 @@ def main():
                                    ["TRAINING SET", "VALIDATION SET"]):
             print(title)
             data = load_data(data_str)
-            Y_pred = ssvm.predict(data.X)
-            print("Predicted classes")
-            print(["%s: %.2f" % (c, x)
-                   for c, x in zip(classes, np.bincount(np.hstack(Y_pred)))])
-            Y_flat = np.hstack(data.Y)
+            if isinstance(ssvm.problem, LatentNodeCRF):
+                X, Y = make_hierarchical_data(data, lateral=False, latent=True)
+            else:
+                X, Y = data.X, data.Y
+            Y_pred = ssvm.predict(X)
+            if isinstance(ssvm.problem, LatentNodeCRF):
+                Y_pred = [ssvm.problem.label_from_latent(h) for h in Y_pred]
+            #print("Predicted classes")
+            #print(["%s: %.2f" % (c, x)
+                   #for c, x in zip(classes, np.bincount(np.hstack(Y_pred)))])
+            Y_flat = np.hstack(Y)
             print("superpixel accuracy: %s"
                   % np.mean((np.hstack(Y_pred) == Y_flat)[Y_flat != 21]))
             results = eval_on_pixels(data, Y_pred)
