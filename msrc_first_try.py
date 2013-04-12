@@ -1,104 +1,22 @@
-import os
-from glob import glob
-
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.misc import imread
 
-from sklearn.externals.joblib import Memory
 from sklearn.metrics import confusion_matrix
 #from sklearn.preprocessing import StandardScaler
 
 #from datasets.msrc import MSRCDataset
-from pystruct.utils import make_grid_edges
 from pystruct import learners
 from pystruct.problems.latent_graph_crf import kmeans_init
 from pystruct.problems import GraphCRF, LatentGraphCRF
 from pystruct.utils import SaveLogger
 
-from datasets.msrc import MSRCDataset
-from msrc_helpers import classes, DataBunch, plot_results, discard_void
+from msrc_helpers import (classes, load_data, plot_results, discard_void,
+                          eval_on_pixels)
 
 #from ignore_void_crf import IgnoreVoidCRF
 
 from IPython.core.debugger import Tracer
 tracer = Tracer()
-
-memory = Memory(cachedir="/tmp/cache")
-
-base_path = "/home/user/amueller/datasets/aurelien_msrc_features/msrc/"
-
-
-@memory.cache
-def load_data(dataset="train", independent=False):
-    mountain_idx = np.where(classes == "mountain")[0]
-    horse_idx = np.where(classes == "horse")[0]
-    void_idx = np.where(classes == "void")[0]
-
-    ds_dict = dict(train="Train", val="Validation", test="Test")
-    if dataset not in ds_dict.keys():
-        raise ValueError("dataset must be one of 'train', 'val', 'test',"
-                         " got %s" % dataset)
-    ds_path = base_path + ds_dict[dataset]
-    file_names, images, all_superpixels = [], [], []
-    X, Y = [], []
-    for f in glob(ds_path + "/*.dat"):
-        name = os.path.basename(f).split('.')[0]
-        img = imread("%s/%s.bmp" % (ds_path, name))
-        labels = np.loadtxt(base_path + "labels/%s.txt" % name, dtype=np.int)
-        images.append(img)
-        file_names.append(name)
-        # features
-        feat = np.hstack([np.loadtxt("%s/%s.local%s" % (ds_path, name, i)) for
-                          i in xrange(1, 7)])
-        # superpixels
-        superpixels = np.fromfile("%s/%s.dat" % (ds_path, name),
-                                  dtype=np.int32)
-        superpixels = superpixels.reshape(img.shape[:-1][::-1]).T - 1
-        all_superpixels.append(superpixels)
-        # generate graph
-        if independent:
-            X.append((feat, np.empty((0, 2), dtype=np.int)))
-        else:
-            graph = region_graph(superpixels)
-            X.append((feat, graph))
-        # make horse and mountain to void
-        labels[labels == mountain_idx] = void_idx
-        labels[labels == horse_idx] = void_idx
-        Y.append(labels)
-    data = DataBunch(X, Y, file_names, images, all_superpixels)
-    return data
-
-
-def region_graph(regions):
-    edges = make_grid_edges(regions)
-    n_vertices = regions.size
-
-    crossings = edges[regions.ravel()[edges[:, 0]]
-                      != regions.ravel()[edges[:, 1]]]
-    crossing_hash = (regions.ravel()[crossings[:, 0]]
-                     + n_vertices * regions.ravel()[crossings[:, 1]])
-    # find unique connections
-    unique_hash = np.unique(crossing_hash)
-    # undo hashing
-    unique_crossings = np.asarray([[x % n_vertices, x / n_vertices]
-                                   for x in unique_hash])
-    if False:
-        # plotting code
-        # compute region centers:
-        gridx, gridy = np.mgrid[:regions.shape[0], :regions.shape[1]]
-        centers = np.zeros((n_vertices, 2))
-        for v in xrange(n_vertices):
-            centers[v] = [gridy[regions == v].mean(),
-                          gridx[regions == v].mean()]
-        # plot labels
-        plt.imshow(regions)
-        # overlay graph:
-        for crossing in unique_crossings:
-            plt.plot([centers[crossing[0]][0], centers[crossing[1]][0]],
-                     [centers[crossing[0]][1], centers[crossing[1]][1]])
-        plt.show()
-    return unique_crossings
 
 
 def plot_confusion_matrix(matrix, title=None):
@@ -203,39 +121,6 @@ def train_car():
     tracer()
 
 
-def eval_on_pixels(data, sp_predictions):
-    """Evaluate segmentation performance on pixel level.
-
-    Parameters
-    ----------
-    data : DataBunch Named tuple
-        Contains images, superpixels, descriptors and filenames.
-
-    sp_predictions : list of arrays
-        For each image, list of labels per superpixel
-
-    """
-    msrc = MSRCDataset()
-    confusion = np.zeros((22, 22))
-    for y, sp, f in zip(sp_predictions, data.superpixels, data.file_names):
-        # load ground truth image
-        gt = msrc.get_ground_truth(f)
-        gt = gt - 1
-        gt[gt == 255] = 21
-        prediction = y[sp]
-        confusion += confusion_matrix(gt.ravel(), prediction.ravel(),
-                                      labels=np.arange(0, 22))
-    # drop void
-    confusion = confusion[:-1, :-1]
-    confusion_normalized = (confusion.astype(np.float) /
-                            confusion.sum(axis=1)[:, np.newaxis])
-    per_class_acc = np.diag(confusion_normalized)
-    global_acc = np.diag(confusion).sum() / confusion.sum()
-    average_acc = np.mean(per_class_acc)
-    return {'global': global_acc, 'average': average_acc,
-            'per_class': per_class_acc, 'confusion': confusion}
-
-
 def train_svm(test=False):
     data_train = load_data("train", independent=True)
     X_features = [x[0] for x in data_train.X]
@@ -248,29 +133,36 @@ def train_svm(test=False):
         y_val = np.hstack(data_val.Y)
         y = np.hstack([y, y_val])
         X_features_flat = np.vstack([X_features_flat, X_features_flat_val])
-    tracer()
-    from sklearn.svm import LinearSVC
-    svm = LinearSVC(C=0.0001, class_weight='auto', dual=False)
+    #from sklearn.svm import LinearSVC
+    #svm = LinearSVC(C=10000, dual=False, class_weight='auto', loss='l1')
+    from sklearn.linear_model import LogisticRegression
+    svm = LogisticRegression(C=.001, dual=False, class_weight='auto')
+    #from pystruct.learners import OneSlackSSVM
+    #from latent_crf_experiments.magic_svm.svm_definition \
+        #import AureliensMagicSVM
+    #class_weight = 1. / np.bincount(y)
+    #class_weight *= len(class_weight) / np.sum(class_weight)
+    #pbl = AureliensMagicSVM(class_weight=class_weight[:-1])
+    #svm = OneSlackSSVM(pbl, n_jobs=1, verbose=2, max_iter=100000, C=0.01,
+                       #show_loss_every=10, tol=0.00001,
+                       #inactive_threshold=1e-4, inactive_window=50,
+                       #check_constraints=True, break_on_bad=True)
     svm.fit(X_features_flat[y != 21], y[y != 21])
 
     results = eval_on_pixels(data_train, [svm.predict(x) for x in X_features])
-    print("global: %f, average: %f" % (results['global'], results['average']))
-    print(["%s: %.2f" % (c, x) for c, x in zip(classes, results['per_class'])])
 
     if test:
         data_test = load_data("test", independent=True)
     else:
         data_test = load_data("val", independent=True)
 
-    X_features = [x[0] for x in data_test.X]
+    X_features = [x[0][:, :5 * 12] for x in data_test.X]
     X_features_flat = np.vstack(X_features)
     y = np.hstack(data_test.Y)
     results = eval_on_pixels(data_test, [svm.predict(x) for x in X_features])
-    print("global: %f, average: %f" % (results['global'], results['average']))
-    print(["%s: %.2f" % (c, x) for c, x in zip(classes, results['per_class'])])
-
-    #plot_results(data_train, [svm.predict(x) for x in X_features],
-                 #folder="blub")
+    results
+    #plot_results(data_test, [svm.predict(x) for x in X_features],
+                 #folder="linear_svc_no_global_001_val_class_weight")
 
     Tracer()()
 
@@ -278,14 +170,22 @@ def train_svm(test=False):
 def main():
     # load training data
     independent = False
+    test = True
     data_train = load_data("train", independent=independent)
-    #X_, Y_ = data_train.X, data_train.Y
     X_, Y_ = discard_void(data_train.X, data_train.Y, 21)
+    if test:
+        data_val = load_data("val", independent=independent)
+        X_val, Y_val = discard_void(data_val.X, data_val.Y, 21)
+
+    X_.extend(X_val)
+    Y_.extend(Y_val)
+
     n_states = 21
     print("number of samples: %s" % len(data_train.X))
-    class_weights = 1. / np.bincount(np.hstack(Y_))
-    class_weights[-1] = 0
-    class_weights /= np.sum(class_weights)
+    #class_weights = 1. / np.bincount(np.hstack(Y_))
+    class_weights = np.ones(n_states)
+    #class_weights *= 21. / np.sum(class_weights)
+    print(class_weights)
     problem = GraphCRF(n_states=n_states, n_features=21 * 6,
                        inference_method='qpbo', class_weight=class_weights)
     #ssvm = learners.SubgradientStructuredSVM(
@@ -293,19 +193,20 @@ def main():
         #learning_rate=0.00015, show_loss_every=10, decay_exponent=.5,
         #momentum=0.98)
     ssvm = learners.OneSlackSSVM(
-        problem, verbose=2, C=0.001, max_iter=100000, n_jobs=-1, tol=0.0001,
-        show_loss_every=200, inference_cache=50,
-        logger=SaveLogger("graph_qpbo_0.0001_class_weights.pickle",
+        problem, verbose=2, C=0.00001, max_iter=100000, n_jobs=-1,
+        tol=0.0001, show_loss_every=200, inference_cache=50, cache_tol='auto',
+        logger=SaveLogger("qpbo_0.00001_discard_void_train_val.pickle",
                           save_every=100),
         inactive_threshold=1e-5, break_on_bad=False)
-    ssvm = SaveLogger(file_name="graph_qpbo_0.001_3_refit2.pickle").load()
-    ssvm.logger = SaveLogger(file_name="graph_qpbo_0.001_3_refit3.pickle",
-                             save_every=50)
-    ssvm.problem.class_weight = np.ones(ssvm.problem.n_states)
-    ssvm.problem.inference_method = 'ad3'
-    #ssvm.inference_cache = 0
-    ssvm.fit(X_, Y_, warm_start=True)
-    #ssvm.fit(X_, Y_)
+    #ssvm = SaveLogger("qpbo_0.001_discard_void_train_val.pickle").load()
+    #ssvm.logger = SaveLogger(file_name=
+                     #"qpbo_0.001_discard_void_train_val_refit2.pickle",
+                     #save_every=100)
+    #ssvm.problem.class_weight = np.ones(ssvm.problem.n_states)
+    #ssvm.problem.inference_method = 'ad3'
+    #ssvm.cache_tol = 'auto'
+    #ssvm.fit(X_, Y_, warm_start=True)
+    ssvm.fit(X_, Y_)
     print("fit finished!")
     tracer()
 
