@@ -9,8 +9,10 @@ from scipy import sparse
 from pystruct.problems import GraphCRF, LatentNodeCRF
 from pystruct import learners
 from pystruct.utils import SaveLogger
+from pystruct.problems.latent_node_crf import kmeans_init
 
-from hierarchical_segmentation import get_segment_features
+from hierarchical_segmentation import (get_segment_features,
+                                       plot_results_hierarchy)
 from msrc_first_try import load_data
 from msrc_helpers import discard_void
 
@@ -65,7 +67,7 @@ def make_hierarchical_data(data, lateral=False, latent=False):
 
 def svm_on_segments():
     # load and prepare data
-    lateral = False
+    lateral = True
     latent = True
     data_train = load_data("train", independent=False)
     X_org_ = data_train.X
@@ -80,22 +82,25 @@ def svm_on_segments():
     #class_weights[-1] = 0
     #class_weights *= 21. / np.sum(class_weights)
 
-    logger = SaveLogger("test_latent_2.0001.pickle", save_every=100)
+    logger = SaveLogger("test_latent_lateral.001_2.pickle", save_every=100)
+    latent_logger = SaveLogger("lssvm_latent_lateral.001_2_%d.pickle",
+                               save_every=1)
     if latent:
         problem = LatentNodeCRF(n_labels=n_states, n_features=21 * 6,
-                                n_hidden_states=50,
+                                n_hidden_states=25,
                                 inference_method='qpbo' if lateral else 'dai',)
                                 #class_weight=class_weights)
         ssvm = learners.LatentSSVM(learners.OneSlackSSVM(
-            problem, verbose=2, C=0.0001, max_iter=100000, n_jobs=-1,
+            problem, verbose=1, C=0.01, max_iter=100000, n_jobs=-1,
             tol=0.0001, show_loss_every=200, inference_cache=50, logger=logger,
-            cache_tol='auto', inactive_threshold=1e-5, break_on_bad=False))
+            cache_tol='auto', inactive_threshold=1e-5, break_on_bad=False),
+            logger=latent_logger)
     else:
         problem = GraphCRF(n_states=n_states, n_features=21 * 6,
                            inference_method='qpbo' if lateral else 'dai',)
                            #class_weight=class_weights)
         ssvm = learners.OneSlackSSVM(
-            problem, verbose=2, C=0.0001, max_iter=100000, n_jobs=-1,
+            problem, verbose=1, C=0.0001, max_iter=100000, n_jobs=-1,
             tol=0.0001, show_loss_every=200, inference_cache=50, logger=logger,
             cache_tol='auto', inactive_threshold=1e-5, break_on_bad=False)
 
@@ -123,13 +128,35 @@ def svm_on_segments():
     # load and prepare data
     data_val = make_hierarchical_data(data_val, lateral=lateral, latent=latent)
 
+    X_val_, Y_val_ = discard_void(data_val.X, data_val.Y, 21)
     print("validation score on augmented validation set: %f"
-          % ssvm.score(data_val.X, data_val.Y))
+          % ssvm.score(X_val_, Y_val_))
 
     #plot_results(images_val, image_names_val, all_labels_val, Y_pred_val,
                  #all_segments_val, folder="figures_segments_val",
                  #use_colors_predict=True)
     tracer()
 
+
+def plot_init():
+    data = load_data("train", independent=False)
+    data = make_hierarchical_data(data, lateral=False, latent=True)
+    #X, Y = discard_void(data.X, data.Y, 21)
+    #data.X, data.Y = X, Y
+    H = kmeans_init(data.X, data.Y, n_labels=22, n_hidden_states=22)
+    plot_results_hierarchy(data, H)
+
+
+def plot_results():
+    data = load_data("val", independent=False)
+    data = make_hierarchical_data(data, lateral=False, latent=True)
+    logger = SaveLogger("test_latent_2.0001.pickle", save_every=100)
+    ssvm = logger.load()
+    plot_results_hierarchy(data, ssvm.predict(data.X),
+                           folder="latent_results_val_50_states_no_lateral")
+
+
 if __name__ == "__main__":
-    svm_on_segments()
+    #svm_on_segments()
+    #plot_init()
+    plot_results()

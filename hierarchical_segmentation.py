@@ -71,8 +71,7 @@ def get_segment_features(x, y, image, sps):
     return segments, features, np.array(labels), edges
 
 
-def plot_results_hierarchy(data, Y_pred, folder="figures",
-                           use_colors_predict=True):
+def plot_results_hierarchy(data, Y_pred, folder="figures"):
     if not os.path.exists(folder):
         os.mkdir(folder)
     msrc = MSRCDataset()
@@ -83,6 +82,8 @@ def plot_results_hierarchy(data, Y_pred, folder="figures",
                      data.segments, data.Y, Y_pred):
         image, image_name, superpixels, segments, y, y_pred = stuff
         h = y_pred[len(y):]
+        y_pred = y_pred[:len(y)]
+
         fig, axes = plt.subplots(2, 3, figsize=(12, 6))
 
         axes[0, 0].imshow(image)
@@ -100,15 +101,16 @@ def plot_results_hierarchy(data, Y_pred, folder="figures",
         axes[1, 1].imshow(image)
         axes[1, 1].imshow(colors[y_pred[superpixels]], vmin=0, vmax=23,
                           alpha=.7)
-        present_y = np.unique(y)
+        present_y = np.unique(np.hstack([y, y_pred]))
 
         vmax = np.max(np.hstack(Y_pred))
         vmin = np.min(np.hstack(Y_pred))
-        axes[1, 2].imshow(h[segments], vmin=vmin, vmax=vmax, alpha=.9,
-                          cmap=random_colormap)
+        axes[1, 2].imshow(mark_boundaries(image, segments[superpixels]))
+        axes[1, 2].imshow(h[segments[superpixels]], vmin=vmin, vmax=vmax,
+                          alpha=.7, cmap=random_colormap)
 
         axes[0, 2].imshow(colors[present_y, :][:, np.newaxis, :],
-                          interpolation='nearest')
+                          interpolation='nearest', alpha=.7)
         for i, c in enumerate(present_y):
             axes[0, 2].text(1, i, classes[c])
         for ax in axes.ravel():
