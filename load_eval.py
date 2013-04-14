@@ -6,12 +6,14 @@ import numpy as np
 #from sklearn.metrics import confusion_matrix
 
 from pystruct.utils import SaveLogger
-from pystruct.problems import LatentNodeCRF
+from pystruct.problems import LatentNodeCRF, EdgeFeatureGraphCRF
 
 from msrc_first_try import eval_on_pixels, load_data
-from msrc_helpers import classes, plot_results
+from msrc_helpers import plot_results, add_edge_features
 from hierarchical_crf import make_hierarchical_data
 from hierarchical_segmentation import plot_results_hierarchy
+
+from kraehenbuehl_potentials import add_kraehenbuehl_features
 
 
 def main():
@@ -38,11 +40,16 @@ def main():
     if argv[2] == 'acc':
 
         #for data_str, title in zip(["train", "val", "test"],
-                   #["TRAINING SET", "VALIDATION SET", "TEST SET"]):
+                                   #["TRAINING SET", "VALIDATION SET",
+                                    #"TEST SET"]):
         for data_str, title in zip(["train", "val"],
                                    ["TRAINING SET", "VALIDATION SET"]):
             print(title)
-            data = load_data(data_str)
+            data = load_data(data_str, independent=False)
+            data = add_kraehenbuehl_features(data)
+            if isinstance(ssvm.problem, EdgeFeatureGraphCRF):
+                data = add_edge_features(data)
+
             if isinstance(ssvm.problem, LatentNodeCRF):
                 data = make_hierarchical_data(data, lateral=True, latent=True)
             Y_pred = ssvm.predict(data.X)
@@ -54,11 +61,7 @@ def main():
             Y_flat = np.hstack(data.Y)
             print("superpixel accuracy: %s"
                   % np.mean((np.hstack(Y_pred) == Y_flat)[Y_flat != 21]))
-            results = eval_on_pixels(data, Y_pred)
-            print("global: %f, average: %f"
-                  % (results['global'], results['average']))
-            print(["%s: %.2f" % (c, x)
-                   for c, x in zip(classes, results['per_class'])])
+            eval_on_pixels(data, Y_pred)
 
     elif argv[2] == 'curves':
         fig, axes = plt.subplots(1, 3)
