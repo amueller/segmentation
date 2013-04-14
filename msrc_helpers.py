@@ -8,7 +8,7 @@ from scipy import sparse
 import matplotlib.pyplot as plt
 
 from sklearn.externals.joblib import Memory
-from sklearn.metrics import confusion_matrix
+#from sklearn.metrics import confusion_matrix
 
 from pystruct.utils import make_grid_edges
 
@@ -108,8 +108,6 @@ def plot_results(data, Y_pred, folder="figures", use_colors_predict=True):
         axes[0, 1].set_title("ground truth")
         axes[0, 1].imshow(image)
         gt = msrc.get_ground_truth(image_name)
-        gt = gt - 1
-        gt[gt == 255] = 21
         axes[0, 1].imshow(colors[gt], alpha=.7)
         axes[1, 0].set_title("sp ground truth")
         axes[1, 0].imshow(image)
@@ -139,9 +137,9 @@ def plot_results(data, Y_pred, folder="figures", use_colors_predict=True):
         plt.close(fig)
 
 
-def discard_void(X, Y, void_label=21):
+def discard_void(data, void_label=21):
     X_new, Y_new = [], []
-    for x, y in zip(X, Y):
+    for x, y in zip(data.X, data.Y):
         mask = y != void_label
         voids = np.where(~mask)[0]
 
@@ -170,7 +168,8 @@ def discard_void(X, Y, void_label=21):
             X_new.append((features[mask[:-n_hidden]], edges_new, n_hidden_new))
             Y_new.append(y[mask[:-n_hidden]])
 
-    return X_new, Y_new
+    return DataBunch(X_new, Y_new, data.file_names, data.images,
+                     data.superpixels)
 
 
 def load_kraehenbuehl(filename):
@@ -196,7 +195,9 @@ def get_kraehenbuehl_pot_sp(data):
         superpixel_indices = np.repeat(superpixels.ravel(), 21)
         sp_probs = sparse.coo_matrix((probs.ravel(), (superpixel_indices,
                                                       class_indices)))
-        feats.append(sp_probs.toarray())
+        sp_probs = sp_probs.toarray()
+        # renormalize (same as dividing by sp sizes)
+        feats.append(sp_probs / sp_probs.sum(axis=-1)[:, np.newaxis])
     return feats
 
 
@@ -216,25 +217,49 @@ def eval_on_pixels(data, sp_predictions, print_results=True):
 
     """
     msrc = MSRCDataset()
-    confusion = np.zeros((22, 22))
-    for y, sp, f in zip(sp_predictions, data.superpixels, data.file_names):
-        # load ground truth image
-        gt = msrc.get_ground_truth(f)
-        gt = gt - 1
-        gt[gt == 255] = 21
-        prediction = y[sp]
-        confusion += confusion_matrix(gt.ravel(), prediction.ravel(),
-                                      labels=np.arange(0, 22))
-    # drop void
-    confusion_normalized = (confusion.astype(np.float) /
-                            confusion.sum(axis=1)[:, np.newaxis])
-    confusion = confusion[:-1, :-1]
-    confusion_normalized = confusion_normalized[:-1, :-1]
-    per_class_acc = np.diag(confusion_normalized)
-    global_acc = np.diag(confusion).sum() / confusion.sum()
-    average_acc = np.mean(per_class_acc)
-    if print_results:
-        print("global: %f, average: %f" % (global_acc, average_acc))
-        print(["%s: %.2f" % (c, x) for c, x in zip(classes, per_class_acc)])
-    return {'global': global_acc, 'average': average_acc,
-            'per_class': per_class_acc, 'confusion': confusion}
+    pixel_predictions = [sp_pred[sp] for sp_pred, sp in zip(sp_predictions,
+                                                            data.superpixels)]
+    result = msrc.eval_pixel_performance(data.file_names, pixel_predictions,
+                                         print_results=print_results)
+    return result
+
+
+def add_edge_features(data):
+    X = []
+    for x, superpixels, image in zip(data.X, data.superpixels, data.images):
+        #features = [100 * np.ones((x[1].shape[0], 1))]
+        features = [np.ones((x[1].shape[0], 1))]
+        features.append(get_edge_contrast(x[1], image, superpixels))
+        features.append(get_edge_directions(x[1], superpixels))
+        X.append((x[0], x[1], np.hstack(features)))
+    return DataBunch(X, data.Y, data.file_names, data.images, data.superpixels)
+
+
+def get_edge_contrast(edges, image, superpixels):
+    r = np.bincount(superpixels.ravel(), weights=image[:, :, 0].ravel())
+    g = np.bincount(superpixels.ravel(), weights=image[:, :, 1].ravel())
+    b = np.bincount(superpixels.ravel(), weights=image[:, :, 2].ravel())
+    mean_colors = (np.vstack([r, g, b])
+                   / np.bincount(superpixels.ravel())).T / 255.
+    contrasts = [np.exp(-10. * np.linalg.norm(mean_colors[e[0]]
+                                              - mean_colors[e[1]]))
+                 for e in edges]
+    return np.vstack(contrasts)
+
+
+@memory.cache
+def get_edge_directions(edges, superpixels):
+    n_vertices = np.max(superpixels) + 1
+    centers = np.empty((n_vertices, 2))
+    gridx, gridy = np.mgrid[:superpixels.shape[0], :superpixels.shape[1]]
+
+    for v in xrange(n_vertices):
+        centers[v] = [gridy[superpixels == v].mean(),
+                      gridx[superpixels == v].mean()]
+    directions = []
+    for edge in edges:
+        e0, e1 = edge
+        diff = centers[e0] - centers[e1]
+        diff /= np.linalg.norm(diff)
+        directions.append(np.arcsin(diff[1]))
+    return np.vstack(directions)
