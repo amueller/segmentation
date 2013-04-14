@@ -1,9 +1,13 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-from datasets.msrc import MSRCDataset, classes
+from datasets.msrc import MSRCDataset
 from msrc_helpers import (load_kraehenbuehl, load_data, eval_on_pixels,
-                          get_kraehenbuehl_pot_sp)
+                          get_kraehenbuehl_pot_sp, DataBunch)
+
+
+def sigm(x):
+    return 1. / (1 + np.exp(-x))
 
 
 def pixelwise():
@@ -13,50 +17,63 @@ def pixelwise():
     for filename in train:
         probs = load_kraehenbuehl(filename)
         prediction = np.argmax(probs, axis=-1)
-        prediction -= 1
-        prediction[prediction == -1] = 21
         predictions.append(prediction)
 
-    results = msrc.eval_pixel_performance(train, predictions)
+    msrc.eval_pixel_performance(train, predictions)
     #plt.matshow(results['confusion'])
     #plt.show()
-    print("global: %f, average: %f" % (results['global'], results['average']))
-    print(["%s: %.2f" % (c, x) for c, x in zip(classes, results['per_class'])])
 
 
 def on_slic_superpixels():
-    msrc = MSRCDataset()
     data = load_data('test', independent=True)
-    predictions = []
     probs = get_kraehenbuehl_pot_sp(data)
-    for superpixels, prob in zip(data.superpixels, probs):
-        sp_prediction = np.argmax(prob, axis=-1)
-        sp_prediction -= 1
-        sp_prediction[sp_prediction == -1] = 21
-        predictions.append(sp_prediction[superpixels])
-    results = msrc.eval_pixel_performance(data.file_names, predictions)
+    results = eval_on_pixels(data, [np.argmax(prob, axis=-1) for prob in
+                                    probs])
     plt.matshow(results['confusion'])
     plt.show()
 
 
-def with_aureliens_potentials_svm():
-    data = load_data('test', independent=True)
-    new_features = []
+def add_kraehenbuehl_features(data):
     sp_probas = get_kraehenbuehl_pot_sp(data)
-    new_features = [np.hstack([x[0], probas])
-                    for x, probas in zip(data.X, sp_probas)]
-    new_features = np.vstack(new_features)
+    X = [(np.hstack([sigm(x[0]), probas]), x[1])
+         for x, probas in zip(data.X, sp_probas)]
+    return DataBunch(X, data.Y, data.file_names, data.images, data.superpixels)
+
+
+def with_aureliens_potentials_svm(test=False):
+    data = load_data('train', independent=True)
+    data = add_kraehenbuehl_features(data)
+    features = [x[0] for x in data.X]
     y = np.hstack(data.Y)
-    from IPython.core.debugger import Tracer
-    Tracer()()
-    from sklearn.linear_model import LogisticRegression
-    svm = LogisticRegression(C=.001, dual=False, class_weight='auto')
-    svm.fit(new_features[y != 21], y[y != 21])
-    eval_on_pixels(data, [svm.predict(x) for x in new_features])
+
+    if test:
+        data_ = load_data('val', independent=True)
+        data_ = add_kraehenbuehl_features(data_)
+        features.extend([x[0] for x in data.X])
+        y = np.hstack([y, np.hstack(data_.Y)])
+
+    new_features_flat = np.vstack(features)
+    from sklearn.svm import LinearSVC
+    print("training svm")
+    svm = LinearSVC(C=.001, dual=False, class_weight='auto')
+    svm.fit(new_features_flat[y != 21], y[y != 21])
+    print(svm.score(new_features_flat[y != 21], y[y != 21]))
+    print("evaluating")
+    eval_on_pixels(data, [svm.predict(x) for x in features])
+
+    if test:
+        print("test data")
+        data_val = load_data('test', independent=True)
+    else:
+        data_val = load_data('val', independent=True)
+
+    data_val = add_kraehenbuehl_features(data_val)
+    features_val = [x[0] for x in data_val.X]
+    eval_on_pixels(data_val, [svm.predict(x) for x in features_val])
     #msrc = MSRCDataset()
 
 
 if __name__ == "__main__":
-    on_slic_superpixels()
-    #with_aureliens_potentials_svm()
+    #on_slic_superpixels()
+    with_aureliens_potentials_svm(test=True)
     #pixelwise()
