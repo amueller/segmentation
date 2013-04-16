@@ -1,4 +1,6 @@
+#!/usr/bin/python
 import sys
+import cPickle
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -9,11 +11,11 @@ from pystruct.utils import SaveLogger
 from pystruct.problems import LatentNodeCRF, EdgeFeatureGraphCRF
 
 from msrc_first_try import eval_on_pixels, load_data
-from msrc_helpers import plot_results, add_edge_features
+from msrc_helpers import plot_results, add_edge_features, add_edges
 from hierarchical_crf import make_hierarchical_data
 from hierarchical_segmentation import plot_results_hierarchy
 
-from kraehenbuehl_potentials import add_kraehenbuehl_features
+#from kraehenbuehl_potentials import add_kraehenbuehl_features
 
 
 def main():
@@ -45,14 +47,25 @@ def main():
         for data_str, title in zip(["train", "val"],
                                    ["TRAINING SET", "VALIDATION SET"]):
             print(title)
-            data = load_data(data_str, independent=False)
-            data = add_kraehenbuehl_features(data)
+            with open("../superpixel_crf/data_probs_%s_cw.pickle"
+                      % data_str) as f:
+                data = cPickle.load(f)
+            data = add_edges(data, independent=False)
+            #data = load_data(data_str, independent=False)
+            #data = add_kraehenbuehl_features(data)
             if isinstance(ssvm.problem, EdgeFeatureGraphCRF):
                 data = add_edge_features(data)
 
             if isinstance(ssvm.problem, LatentNodeCRF):
                 data = make_hierarchical_data(data, lateral=True, latent=True)
-            Y_pred = ssvm.predict(data.X)
+            if False:
+                from sklearn.kernel_approximation import AdditiveChi2Sampler
+                chi2 = AdditiveChi2Sampler(sample_steps=2)
+                X_ = [(chi2.fit_transform(x[0]), x[1]) for x in data.X]
+                Y_pred = ssvm.predict(X_)
+            else:
+                Y_pred = ssvm.predict(data.X)
+
             if isinstance(ssvm.problem, LatentNodeCRF):
                 Y_pred = [ssvm.problem.label_from_latent(h) for h in Y_pred]
             #print("Predicted classes")

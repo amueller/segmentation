@@ -48,17 +48,13 @@ def load_data(dataset="train", independent=False):
                                   dtype=np.int32)
         superpixels = superpixels.reshape(img.shape[:-1][::-1]).T - 1
         all_superpixels.append(superpixels)
-        # generate graph
-        if independent:
-            X.append((feat, np.empty((0, 2), dtype=np.int)))
-        else:
-            graph = region_graph(superpixels)
-            X.append((feat, graph))
         # make horse and mountain to void
         labels[labels == mountain_idx] = void_idx
         labels[labels == horse_idx] = void_idx
         Y.append(labels)
+        X.append(feat)
     data = DataBunch(X, Y, file_names, all_superpixels)
+    data = add_edges(data, independent=independent)
     return data
 
 
@@ -136,6 +132,17 @@ def plot_results(data, Y_pred, folder="figures", use_colors_predict=True):
         axes[1, 2].set_visible(False)
         fig.savefig(folder + "/%s.png" % image_name, bbox_inches="tight")
         plt.close(fig)
+
+
+def add_edges(data, independent=False):
+    # generate graph
+    if independent:
+        X_new = [(x, np.empty((0, 2), dtype=np.int)) for x in data.X]
+    else:
+        X_new = [(x, region_graph(sp)) for x, sp in zip(data.X,
+                                                        data.superpixels)]
+
+    return DataBunch(X_new, data.Y, data.file_names, data.superpixels)
 
 
 def discard_void(data, void_label=21):

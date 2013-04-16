@@ -1,17 +1,20 @@
+import cPickle
+
 import numpy as np
 import matplotlib.pyplot as plt
 
-from sklearn.metrics import confusion_matrix
-#from sklearn.preprocessing import StandardScaler
+#from sklearn.kernel_approximation import AdditiveChi2Sampler
 
-#from datasets.msrc import MSRCDataset
+from datasets.msrc import MSRCDataset
 from pystruct import learners
 from pystruct.problems.latent_graph_crf import kmeans_init
-from pystruct.problems import EdgeFeatureGraphCRF
+#from pystruct.problems import EdgeFeatureGraphCRF
+from pystruct.problems import GraphCRF
 from pystruct.utils import SaveLogger
 
 from msrc_helpers import (classes, load_data, plot_results, discard_void,
-                          eval_on_pixels, add_edge_features)
+                          eval_on_pixels, add_edge_features, add_edges,
+                          DataBunch)
 
 from kraehenbuehl_potentials import add_kraehenbuehl_features
 
@@ -50,6 +53,21 @@ def plot_parts():
     plot_results(images, file_names, Y, H, all_superpixels,
                  folder="test_parts", use_colors_predict=False)
     tracer()
+
+
+def load_stacked_results(ds='train'):
+    path = "../superpixel_crf/blub/"
+    msrc = MSRCDataset()
+    files = msrc.get_split(ds)
+    X = []
+    for f in files:
+        probs = np.load(path + f + "_probs.npy")
+        X.append(probs)
+    with open("../superpixel_crf/data_probs_%s_cw.pickle"
+              % ds) as f:
+        data = cPickle.load(f)
+    assert(np.all(data.file_names == files))
+    return DataBunch(X, data.Y, files, data.superpixels)
 
 
 def train_svm(test=False, C=0.01):
@@ -105,15 +123,25 @@ def main():
     # load training data
     independent = False
     test = False
-    data_train = load_data("train", independent=independent)
-    data_train = add_kraehenbuehl_features(data_train)
+    with open("../superpixel_crf/data_probs_train_cw.pickle") as f:
+        data_train = cPickle.load(f)
+
+    #with open("../superpixel_crf/data_val_1000_color.pickle") as f:
+        #data_val = cPickle.load(f)
+    #data_train = load_data("train", independent=independent)
+    #data_train = add_kraehenbuehl_features(data_train)
+    data_train = add_edges(data_train, independent=independent)
+    #data_val = add_edges(data_val)
+
     data_train = discard_void(data_train, 21)
-    data_train = add_edge_features(data_train)
+    #data_train = add_edge_features(data_train)
     X_, Y_ = data_train.X, data_train.Y
+    #chi2 = AdditiveChi2Sampler(sample_steps=2)
+    #X_ = [(chi2.fit_transform(x[0]), x[1]) for x in X_]
 
     if test:
         data_val = load_data("val", independent=independent)
-        data_val = add_kraehenbuehl_features(data_val)
+        #data_val = add_kraehenbuehl_features(data_val)
         data_val = discard_void(data_val, 21)
         data_val = add_edge_features(data_val)
 
@@ -122,31 +150,32 @@ def main():
 
     n_states = 21
     print("number of samples: %s" % len(data_train.X))
-    #class_weights = 1. / np.bincount(np.hstack(Y_))
-    class_weights = np.ones(n_states)
-    #class_weights *= 21. / np.sum(class_weights)
+    class_weights = 1. / np.bincount(np.hstack(Y_))
+    class_weights *= 21. / np.sum(class_weights)
+    #class_weights = np.ones(n_states)
     print(class_weights)
-    #problem = GraphCRF(n_states=n_states, n_features=21 * 6 + 21,
-                       #inference_method='qpbo', class_weight=class_weights)
-    problem = EdgeFeatureGraphCRF(n_states=n_states, n_features=21 * 6 + 21,
-                                  inference_method='qpbo',
-                                  class_weight=class_weights,
-                                  n_edge_features=3,
-                                  symmetric_edge_features=[0, 1],
-                                  antisymmetric_edge_features=[2])
+    problem = GraphCRF(n_states=n_states, n_features=X_[0][0].shape[1],
+                       inference_method='qpbo', class_weight=class_weights)
+    #problem = EdgeFeatureGraphCRF(n_states=n_states, n_features=21 * 6,
+                                  #inference_method='qpbo',
+                                  #class_weight=class_weights,
+                                  #n_edge_features=3,
+                                  #symmetric_edge_features=[0, 1],
+                                  #antisymmetric_edge_features=[2])
     #ssvm = learners.SubgradientStructuredSVM(
         #problem, verbose=2, C=.001, n_jobs=-1, max_iter=100000,
         #learning_rate=0.00015, show_loss_every=10, decay_exponent=.5,
         #momentum=0.98)
     ssvm = learners.OneSlackSSVM(
         problem, verbose=1, C=0.001, max_iter=100000, n_jobs=-1,
-        tol=0.0001, show_loss_every=200, inference_cache=50, cache_tol='auto',
-        logger=SaveLogger("edge_features_both_sym.001.pickle",
+        tol=0.0001, show_loss_every=50, inference_cache=0, cache_tol='auto',
+        logger=SaveLogger("probs_pairwise_0.001.pickle",
                           save_every=100),
         inactive_threshold=1e-5, break_on_bad=False)
-    #ssvm = SaveLogger("edge_features_sym_asym.001.pickle").load()
-    #ssvm.logger = SaveLogger(file_name="pairwise_0.1_refit.pickle",
-                             #save_every=100)
+    #ssvm = SaveLogger("bow_1000_no_edges_chi2_.01.pickle").load()
+    #ssvm.logger = SaveLogger(
+        #file_name="bow_1000_no_edges_chi2_.01_refit.pickle", save_every=100)
+    #ssvm.n_jobs = 5
     #ssvm.problem.class_weight = np.ones(ssvm.problem.n_states)
     #ssvm.problem.inference_method = 'ad3'
     #ssvm.fit(X_, Y_, warm_start=True)
@@ -156,27 +185,13 @@ def main():
 
     # do some evaluation on the training set
     print("score on training set: %f" % ssvm.score(X_, Y_))
-    Y_pred = ssvm.predict(data_train.X)
-    # compute confusion matrix
-    confusion = np.zeros((n_states, n_states))
-    for y, y_pred in zip(data_train.Y, Y_pred):
-        confusion += confusion_matrix(y, y_pred, labels=np.arange(n_states))
-    plot_confusion_matrix(confusion, title="confusion")
-
-    # plot pairwise weights
-    pairwise_flat = np.asarray(ssvm.w[problem.n_states * problem.n_features:])
-    pairwise_params = np.zeros((problem.n_states, problem.n_states))
-    pairwise_params[np.tri(problem.n_states, dtype=np.bool)] = pairwise_flat
-    plot_confusion_matrix(pairwise_params, title="pairwise_params")
-    plt.figure()
-    plt.plot(ssvm.objective_curve_)
-    plt.show()
 
     # make figures with predictions
     #plot_results(data_train.images, data_train.file_names, data_train.Y,
                  #Y_pred, data_train.all_superpixels, folder="figures_train")
-    data_val = load_data("val", independent=independent)
-    data_val = add_kraehenbuehl_features(data_val)
+
+    #data_val = load_data("val", independent=independent)
+    #data_val = add_kraehenbuehl_features(data_val)
     X_val_, Y_val_ = discard_void(data_val.X, data_val.Y, 21)
     X_edge_features_val = [(x[0], x[1], np.ones((x[1].shape[0], 1))) for x
                            in data_val.X]
@@ -184,8 +199,6 @@ def main():
     #print("score on validation set: %f" % ssvm.score(X_val_, Y_val_))
     print("score on validation set: %f" % ssvm.score(X_edge_features_val,
                                                      Y_val_))
-    Y_pred_val = ssvm.predict(data_val.X)
-    plot_results(data_val, Y_pred_val, folder="figures_val")
     tracer()
 
 
