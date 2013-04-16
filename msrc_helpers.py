@@ -14,7 +14,9 @@ from pystruct.utils import make_grid_edges
 
 from datasets.msrc import MSRCDataset, colors, classes
 
-DataBunch = namedtuple('DataBunch', 'X, Y, file_names, images, superpixels')
+# stores information that was COMPUTED from the dataset + file names for
+# correspondence
+DataBunch = namedtuple('DataBunch', 'X, Y, file_names, superpixels')
 
 base_path = "/home/user/amueller/datasets/aurelien_msrc_features/msrc/"
 memory = Memory(cachedir="/tmp/cache")
@@ -31,13 +33,12 @@ def load_data(dataset="train", independent=False):
         raise ValueError("dataset must be one of 'train', 'val', 'test',"
                          " got %s" % dataset)
     ds_path = base_path + ds_dict[dataset]
-    file_names, images, all_superpixels = [], [], []
+    file_names, all_superpixels = [], [], []
     X, Y = [], []
     for f in glob(ds_path + "/*.dat"):
         name = os.path.basename(f).split('.')[0]
         img = imread("%s/%s.bmp" % (ds_path, name))
         labels = np.loadtxt(base_path + "labels/%s.txt" % name, dtype=np.int)
-        images.append(img)
         file_names.append(name)
         # features
         feat = np.hstack([np.loadtxt("%s/%s.local%s" % (ds_path, name, i)) for
@@ -57,7 +58,7 @@ def load_data(dataset="train", independent=False):
         labels[labels == mountain_idx] = void_idx
         labels[labels == horse_idx] = void_idx
         Y.append(labels)
-    data = DataBunch(X, Y, file_names, images, all_superpixels)
+    data = DataBunch(X, Y, file_names, all_superpixels)
     return data
 
 
@@ -99,10 +100,10 @@ def plot_results(data, Y_pred, folder="figures", use_colors_predict=True):
     import matplotlib.colors as cl
     np.random.seed(0)
     random_colormap = cl.ListedColormap(np.random.uniform(size=(100, 3)))
-    for image, image_name, superpixels, y, y_pred in zip(data.images,
-                                                         data.file_names,
-                                                         data.superpixels,
-                                                         data.Y, Y_pred):
+    for image_name, superpixels, y, y_pred in zip(data.file_names,
+                                                  data.superpixels, data.Y,
+                                                  Y_pred):
+        image = msrc.get_image(image_name)
         fig, axes = plt.subplots(2, 3, figsize=(12, 6))
         axes[0, 0].imshow(image)
         axes[0, 1].set_title("ground truth")
@@ -168,8 +169,7 @@ def discard_void(data, void_label=21):
             X_new.append((features[mask[:-n_hidden]], edges_new, n_hidden_new))
             Y_new.append(y[mask[:-n_hidden]])
 
-    return DataBunch(X_new, Y_new, data.file_names, data.images,
-                     data.superpixels)
+    return DataBunch(X_new, Y_new, data.file_names, data.superpixels)
 
 
 def load_kraehenbuehl(filename):
@@ -207,7 +207,7 @@ def eval_on_pixels(data, sp_predictions, print_results=True):
     Parameters
     ----------
     data : DataBunch Named tuple
-        Contains images, superpixels, descriptors and filenames.
+        Contains superpixels, descriptors, superpixel gt and filenames.
 
     sp_predictions : list of arrays
         For each image, list of labels per superpixel
@@ -226,13 +226,16 @@ def eval_on_pixels(data, sp_predictions, print_results=True):
 
 def add_edge_features(data):
     X = []
-    for x, superpixels, image in zip(data.X, data.superpixels, data.images):
+    msrc = MSRCDataset()
+    for x, superpixels, file_name in zip(data.X, data.superpixels,
+                                         data.file_names):
         #features = [100 * np.ones((x[1].shape[0], 1))]
         features = [np.ones((x[1].shape[0], 1))]
+        image = msrc.get_image(file_name)
         features.append(get_edge_contrast(x[1], image, superpixels))
         features.append(get_edge_directions(x[1], superpixels))
         X.append((x[0], x[1], np.hstack(features)))
-    return DataBunch(X, data.Y, data.file_names, data.images, data.superpixels)
+    return DataBunch(X, data.Y, data.file_names, data.superpixels)
 
 
 def get_edge_contrast(edges, image, superpixels):
