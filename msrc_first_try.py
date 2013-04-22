@@ -9,7 +9,8 @@ from datasets.msrc import MSRCDataset
 from pystruct import learners
 from pystruct.problems.latent_graph_crf import kmeans_init
 #from pystruct.problems import EdgeFeatureGraphCRF
-from pystruct.problems import GraphCRF
+#from pystruct.problems import GraphCRF
+import pystruct.problems as crfs
 from pystruct.utils import SaveLogger
 
 from msrc_helpers import (classes, load_data, plot_results, discard_void,
@@ -55,14 +56,21 @@ def plot_parts():
     tracer()
 
 
-def load_stacked_results(ds='train'):
-    path = "../superpixel_crf/blub/"
+def sigm(x):
+    x = 1. / (1 + np.exp(-x))
+    #return np.hstack([x, np.ones((x.shape[0], 1))])
+    return x
+
+
+def load_stacked_results(ds='train', path='../superpixel_crf/blub2/'):
+    #path = "../superpixel_crf/blub2/"
+    #path = "../superpixel_crf/logreg_C10_v10/"
     msrc = MSRCDataset()
     files = msrc.get_split(ds)
     X = []
     for f in files:
         probs = np.load(path + f + "_probs.npy")
-        X.append(probs)
+        X.append(sigm(probs))
     with open("../superpixel_crf/data_probs_%s_cw.pickle"
               % ds) as f:
         data = cPickle.load(f)
@@ -72,15 +80,19 @@ def load_stacked_results(ds='train'):
 
 def train_svm(test=False, C=0.01):
 
-    data_train = load_data("train", independent=True)
-    data_train = add_kraehenbuehl_features(data_train)
-    X_features = [x[0] for x in data_train.X]
+    data_train = load_stacked_results()
+    #data_train = load_data("train", independent=True)
+    #data_train = add_kraehenbuehl_features(data_train)
+    #X_features = [x[0] for x in data_train.X]
+    X_features = data_train.X
     X_features_flat = np.vstack(X_features)
     y = np.hstack(data_train.Y)
     if test:
-        data_val = load_data("val", independent=True)
-        data_val = add_kraehenbuehl_features(data_val)
-        X_features_val = [x[0] for x in data_val.X]
+        data_val = load_stacked_results('val')
+        #data_val = load_data("val", independent=True)
+        #data_val = add_kraehenbuehl_features(data_val)
+        #X_features_val = [x[0] for x in data_val.X]
+        X_features_val = data_val.X
         X_features_flat_val = np.vstack(X_features_val)
         y_val = np.hstack(data_val.Y)
         y = np.hstack([y, y_val])
@@ -99,51 +111,58 @@ def train_svm(test=False, C=0.01):
                        #show_loss_every=10, tol=0.00001,
                        #inactive_threshold=1e-4, inactive_window=50,
                        #check_constraints=True, break_on_bad=True)
+    #print("SIGM")
     svm.fit(X_features_flat[y != 21], y[y != 21])
 
     eval_on_pixels(data_train, [svm.predict(x) for x in X_features])
 
     if test:
-        data_test = load_data("test", independent=True)
+        #data_test = load_data("test", independent=True)
+        data_test = load_stacked_results('test')
     else:
-        data_test = load_data("val", independent=True)
+        #data_test = load_data("val", independent=True)
+        data_test = load_stacked_results('val')
 
-    data_test = add_kraehenbuehl_features(data_test)
+    #data_test = add_kraehenbuehl_features(data_test)
 
-    X_features = [x[0] for x in data_test.X]
+    #X_features = [x[0] for x in data_test.X]
+    X_features = data_test.X
     y = np.hstack(data_test.Y)
     eval_on_pixels(data_test, [svm.predict(x) for x in X_features])
-    plot_results(data_test, [svm.predict(x) for x in X_features],
-                 folder="kraehenbuehl_aurelien_linear_svc")
-
-    Tracer()()
+    #plot_results(data_test, [svm.predict(x) for x in X_features],
+                 #folder="probs_100_linear_svc_0.1")
 
 
 def main():
     # load training data
     independent = False
-    test = False
-    with open("../superpixel_crf/data_probs_train_cw.pickle") as f:
+    test = True
+    with open("../superpixel_crf/data_probs_train_cw_trainval.pickle") as f:
         data_train = cPickle.load(f)
+    #data_train = load_stacked_results()
 
     #with open("../superpixel_crf/data_val_1000_color.pickle") as f:
         #data_val = cPickle.load(f)
     #data_train = load_data("train", independent=independent)
-    #data_train = add_kraehenbuehl_features(data_train)
     data_train = add_edges(data_train, independent=independent)
-    #data_val = add_edges(data_val)
+    data_train = add_kraehenbuehl_features(data_train)
 
     data_train = discard_void(data_train, 21)
-    #data_train = add_edge_features(data_train)
+    if not independent:
+        data_train = add_edge_features(data_train)
     X_, Y_ = data_train.X, data_train.Y
     #chi2 = AdditiveChi2Sampler(sample_steps=2)
     #X_ = [(chi2.fit_transform(x[0]), x[1]) for x in X_]
 
     if test:
-        data_val = load_data("val", independent=independent)
-        #data_val = add_kraehenbuehl_features(data_val)
+        with open("../superpixel_crf/data_probs_val_cw_trainval.pickle") as f:
+            data_val = cPickle.load(f)
+        #data_val = load_data("val", independent=independent)
+        data_val = add_edges(data_val, independent=independent)
+        data_val = add_kraehenbuehl_features(data_val)
         data_val = discard_void(data_val, 21)
-        data_val = add_edge_features(data_val)
+        if not independent:
+            data_val = add_edge_features(data_val)
 
         X_.extend(data_val.X)
         Y_.extend(data_val.Y)
@@ -154,31 +173,39 @@ def main():
     class_weights *= 21. / np.sum(class_weights)
     #class_weights = np.ones(n_states)
     print(class_weights)
-    problem = GraphCRF(n_states=n_states, n_features=X_[0][0].shape[1],
-                       inference_method='qpbo', class_weight=class_weights)
-    #problem = EdgeFeatureGraphCRF(n_states=n_states, n_features=21 * 6,
-                                  #inference_method='qpbo',
-                                  #class_weight=class_weights,
-                                  #n_edge_features=3,
-                                  #symmetric_edge_features=[0, 1],
-                                  #antisymmetric_edge_features=[2])
-    #ssvm = learners.SubgradientStructuredSVM(
-        #problem, verbose=2, C=.001, n_jobs=-1, max_iter=100000,
-        #learning_rate=0.00015, show_loss_every=10, decay_exponent=.5,
-        #momentum=0.98)
+    problem = crfs.GraphCRF(n_states=n_states, n_features=X_[0][0].shape[1],
+                            inference_method='qpbo',
+                            class_weight=class_weights)
+    #problem = crfs.EdgeFeatureGraphCRF(n_states=n_states,
+                                       #n_features=X_[0][0].shape[1],
+                                       #inference_method='qpbo',
+                                       #class_weight=class_weights,
+                                       #n_edge_features=3,
+                                       #symmetric_edge_features=[0, 1],
+                                       #antisymmetric_edge_features=[2])
+    experiment_name = "piecewise_std_graph_kraehenbuehl_.01_trainval"
+    #ssvm = learners.SubgradientSSVM(
+        #problem, verbose=2, C=0.1, n_jobs=-1, max_iter=100000,
+        #learning_rate=0.001, show_loss_every=10, decay_exponent=0.5,
+        #momentum=0.0,
+        #logger=SaveLogger(experiment_name + ".pickle", save_every=10))
     ssvm = learners.OneSlackSSVM(
-        problem, verbose=1, C=0.001, max_iter=100000, n_jobs=-1,
-        tol=0.0001, show_loss_every=50, inference_cache=0, cache_tol='auto',
-        logger=SaveLogger("probs_pairwise_0.001.pickle",
-                          save_every=100),
+        problem, verbose=2, C=0.01, max_iter=100000, n_jobs=-1,
+        tol=0.0001, show_loss_every=50, inference_cache=50, cache_tol='auto',
+        logger=SaveLogger(experiment_name + ".pickle", save_every=100),
         inactive_threshold=1e-5, break_on_bad=False)
-    #ssvm = SaveLogger("bow_1000_no_edges_chi2_.01.pickle").load()
+    #ssvm = SaveLogger(experiment_name + ".pickle").load()
     #ssvm.logger = SaveLogger(
-        #file_name="bow_1000_no_edges_chi2_.01_refit.pickle", save_every=100)
+        #file_name=experiment_name + "_refit.pickle",
+        #save_every=100)
     #ssvm.n_jobs = 5
     #ssvm.problem.class_weight = np.ones(ssvm.problem.n_states)
-    #ssvm.problem.inference_method = 'ad3'
+    #ssvm.problem.inference_method = 'lp'
+    #ssvm.tol = -10
     #ssvm.fit(X_, Y_, warm_start=True)
+    #from sklearn.utils import shuffle
+    #X_shuffled, Y_shuffled = shuffle(X_, Y_)
+    #ssvm.fit(X_shuffled, Y_shuffled)
     ssvm.fit(X_, Y_)
     print("fit finished!")
     tracer()

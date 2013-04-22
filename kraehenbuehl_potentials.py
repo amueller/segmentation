@@ -12,7 +12,7 @@ def sigm(x):
 
 def pixelwise():
     msrc = MSRCDataset()
-    train = msrc.get_split('val')
+    train = msrc.get_split('train')
     predictions = []
     for filename in train:
         probs = load_kraehenbuehl(filename)
@@ -25,7 +25,7 @@ def pixelwise():
 
 
 def on_slic_superpixels():
-    data = load_data('test', independent=True)
+    data = load_data('train', independent=True)
     probs = get_kraehenbuehl_pot_sp(data)
     results = eval_on_pixels(data, [np.argmax(prob, axis=-1) for prob in
                                     probs])
@@ -37,7 +37,7 @@ def add_kraehenbuehl_features(data):
     sp_probas = get_kraehenbuehl_pot_sp(data)
     X = [(np.hstack([sigm(x[0]), probas]), x[1])
          for x, probas in zip(data.X, sp_probas)]
-    return DataBunch(X, data.Y, data.file_names, data.images, data.superpixels)
+    return DataBunch(X, data.Y, data.file_names, data.superpixels)
 
 
 def with_aureliens_potentials_svm(test=False):
@@ -75,5 +75,5 @@ def with_aureliens_potentials_svm(test=False):
 
 if __name__ == "__main__":
     #on_slic_superpixels()
-    with_aureliens_potentials_svm(test=True)
-    #pixelwise()
+    #with_aureliens_potentials_svm(test=True)
+    pixelwise()

@@ -33,7 +33,7 @@ def load_data(dataset="train", independent=False):
         raise ValueError("dataset must be one of 'train', 'val', 'test',"
                          " got %s" % dataset)
     ds_path = base_path + ds_dict[dataset]
-    file_names, all_superpixels = [], [], []
+    file_names, all_superpixels = [], []
     X, Y = [], []
     for f in glob(ds_path + "/*.dat"):
         name = os.path.basename(f).split('.')[0]
@@ -175,12 +175,15 @@ def discard_void(data, void_label=21):
             n_hidden_new = np.max(edges_new) - np.sum(mask[:-n_hidden]) + 1
             X_new.append((features[mask[:-n_hidden]], edges_new, n_hidden_new))
             Y_new.append(y[mask[:-n_hidden]])
+            #X_new.append((features[mask], edges_new, n_hidden_new))
+            #Y_new.append(y[mask[:-n_hidden]])
 
     return DataBunch(X_new, Y_new, data.file_names, data.superpixels)
 
 
 def load_kraehenbuehl(filename):
     path = "/home/user/amueller/datasets/kraehenbuehl_potentials_msrc/out/"
+    #path = "/home/local/datasets/MSRC_ObjCategImageDatabase_v2/asdf/"
     with open(path + filename + ".unary") as f:
         size = np.fromfile(f, dtype=np.uint32, count=3).byteswap()
         data = np.fromfile(f, dtype=np.float32).byteswap()
@@ -188,7 +191,7 @@ def load_kraehenbuehl(filename):
     return img
 
 
-@memory.cache
+#@memory.cache
 def get_kraehenbuehl_pot_sp(data):
     feats = []
     for x, filename, superpixels in zip(data.X, data.file_names,
@@ -236,7 +239,6 @@ def add_edge_features(data):
     msrc = MSRCDataset()
     for x, superpixels, file_name in zip(data.X, data.superpixels,
                                          data.file_names):
-        #features = [100 * np.ones((x[1].shape[0], 1))]
         features = [np.ones((x[1].shape[0], 1))]
         image = msrc.get_image(file_name)
         features.append(get_edge_contrast(x[1], image, superpixels))

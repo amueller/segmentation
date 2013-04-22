@@ -10,8 +10,8 @@ from sklearn.cluster import KMeans
 from sklearn.externals.joblib import Memory
 from skimage.segmentation import mark_boundaries
 
-from msrc_first_try import load_data
-from msrc_helpers import MSRCDataset, colors, classes
+#from msrc_first_try import load_data
+from msrc_helpers import MSRCDataset, colors, classes, add_edges
 
 
 memory = Memory(cachedir="/tmp/cache", verbose=0)
@@ -37,13 +37,13 @@ def get_centers(sps):
     return centers
 
 
-def get_km_segments(x, image, sps):
+def get_km_segments(x, image, sps, n_segments=25):
     feats, edges = x
     colors_ = get_colors(image, sps)
     centers = get_centers(sps)
     #graph = sparse.coo_matrix((np.ones(edges.shape[0]), edges.T))
     #ward = Ward(n_clusters=25, connectivity=graph)
-    km = KMeans(n_clusters=25)
+    km = KMeans(n_clusters=n_segments)
     color_feats = np.hstack([colors_, centers * 2])
     return km.fit_predict(color_feats)
 
@@ -78,9 +78,10 @@ def plot_results_hierarchy(data, Y_pred, folder="figures"):
     import matplotlib.colors as cl
     np.random.seed(0)
     random_colormap = cl.ListedColormap(np.random.uniform(size=(100, 3)))
-    for stuff in zip(data.images, data.file_names, data.superpixels,
+    for stuff in zip(data.file_names, data.superpixels,
                      data.segments, data.Y, Y_pred):
-        image, image_name, superpixels, segments, y, y_pred = stuff
+        image_name, superpixels, segments, y, y_pred = stuff
+        image = msrc.get_image(image_name)
         h = y_pred[len(y):]
         y_pred = y_pred[:len(y)]
 
@@ -90,8 +91,6 @@ def plot_results_hierarchy(data, Y_pred, folder="figures"):
         axes[0, 1].set_title("ground truth")
         axes[0, 1].imshow(image)
         gt = msrc.get_ground_truth(image_name)
-        gt = gt - 1
-        gt[gt == 255] = 21
         axes[0, 1].imshow(colors[gt], alpha=.7)
         axes[1, 0].set_title("sp ground truth")
         axes[1, 0].imshow(image)
@@ -121,13 +120,20 @@ def plot_results_hierarchy(data, Y_pred, folder="figures"):
 
 
 def main():
-    X, Y, image_names, images, all_superpixels = load_data(
-        "train", independent=False)
-    for x, name, image, sps in zip(X, image_names, images, all_superpixels):
-        segments = get_km_segments(x, image, sps)
-        boundary_image = mark_boundaries(mark_boundaries(image, sps),
-                                         segments[sps], color=[1, 0, 0])
-        imsave("hierarchy_sp/%s.png" % name, boundary_image)
+    import cPickle
+    from datasets.msrc import MSRCDataset
+    with open("../superpixel_crf/data_probs_train_cw.pickle") as f:
+        data = cPickle.load(f)
+    data = add_edges(data, independent=False)
+    msrc = MSRCDataset()
+    #X, Y, image_names, images, all_superpixels = load_data(
+        #"train", independent=False)
+    for x, name, sps in zip(data.X, data.file_names, data.superpixels):
+        segments = get_km_segments(x, msrc.get_image(name), sps, n_segments=10)
+        boundary_image = mark_boundaries(mark_boundaries(msrc.get_image(name),
+                                                         sps), segments[sps],
+                                         color=[1, 0, 0])
+        imsave("hierarchy_sp_own_10/%s.png" % name, boundary_image)
 
 
 if __name__ == "__main__":
