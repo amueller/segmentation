@@ -3,7 +3,7 @@ import cPickle
 import numpy as np
 import matplotlib.pyplot as plt
 
-#from sklearn.kernel_approximation import AdditiveChi2Sampler
+from sklearn.kernel_approximation import AdditiveChi2Sampler
 
 from datasets.msrc import MSRCDataset
 from pystruct import learners
@@ -17,7 +17,7 @@ from msrc_helpers import (classes, load_data, plot_results, discard_void,
                           eval_on_pixels, add_edge_features, add_edges,
                           DataBunch)
 
-from kraehenbuehl_potentials import add_kraehenbuehl_features
+#from kraehenbuehl_potentials import add_kraehenbuehl_features
 
 
 from IPython.core.debugger import Tracer
@@ -80,7 +80,9 @@ def load_stacked_results(ds='train', path='../superpixel_crf/blub2/'):
 
 def train_svm(test=False, C=0.01):
 
-    data_train = load_stacked_results()
+    #data_train = load_stacked_results()
+    with open("../superpixel_crf/data_train_1000_color.pickle") as f:
+        data_train = cPickle.load(f)
     #data_train = load_data("train", independent=True)
     #data_train = add_kraehenbuehl_features(data_train)
     #X_features = [x[0] for x in data_train.X]
@@ -97,47 +99,57 @@ def train_svm(test=False, C=0.01):
         y_val = np.hstack(data_val.Y)
         y = np.hstack([y, y_val])
         X_features_flat = np.vstack([X_features_flat, X_features_flat_val])
-    from sklearn.svm import LinearSVC
-    svm = LinearSVC(C=C, dual=False, class_weight='auto')
+    #from sklearn.svm import LinearSVC
+    #svm = LinearSVC(C=C, dual=False,
+                    #multi_class='crammer_singer', fit_intercept=False,
+                    #verbose=10, class_weight='auto')
     #from sklearn.linear_model import LogisticRegression
     #svm = LogisticRegression(C=.5, dual=False, class_weight='auto')
     #from pystruct.learners import OneSlackSSVM
-    #from latent_crf_experiments.magic_svm.svm_definition \
-        #import AureliensMagicSVM
-    #class_weight = 1. / np.bincount(y)
-    #class_weight *= len(class_weight) / np.sum(class_weight)
-    #pbl = AureliensMagicSVM(class_weight=class_weight[:-1])
-    #svm = OneSlackSSVM(pbl, n_jobs=1, verbose=2, max_iter=100000, C=0.01,
-                       #show_loss_every=10, tol=0.00001,
-                       #inactive_threshold=1e-4, inactive_window=50,
-                       #check_constraints=True, break_on_bad=True)
-    #print("SIGM")
-    svm.fit(X_features_flat[y != 21], y[y != 21])
+    class_weight = 1. / np.bincount(y)
+    class_weight *= len(class_weight) / np.sum(class_weight)
+    pbl = crfs.CrammerSingerSVMProblem(n_classes=21, n_features=3 *
+                                       X_features_flat.shape[1],
+                                       class_weight=class_weight[:-1],
+                                       rescale_C=True)
+    svm = learners.OneSlackSSVM(pbl, n_jobs=1, verbose=2, max_iter=100000,
+                                C=C, show_loss_every=50, tol=0.001,
+                                inactive_threshold=1e-4, inactive_window=50,
+                                check_constraints=True, break_on_bad=True)
+    chi2 = AdditiveChi2Sampler(sample_steps=2)
+    svm.fit(chi2.fit_transform(X_features_flat[y != 21]), y[y != 21])
 
-    eval_on_pixels(data_train, [svm.predict(x) for x in X_features])
+    eval_on_pixels(data_train, [svm.predict(chi2.transform(x)) for x in
+                                X_features])
 
     if test:
         #data_test = load_data("test", independent=True)
         data_test = load_stacked_results('test')
     else:
         #data_test = load_data("val", independent=True)
-        data_test = load_stacked_results('val')
+        #data_test = load_stacked_results('val')
+        with open("../superpixel_crf/data_val_1000_color.pickle") as f:
+            data_test = cPickle.load(f)
 
     #data_test = add_kraehenbuehl_features(data_test)
 
     #X_features = [x[0] for x in data_test.X]
     X_features = data_test.X
     y = np.hstack(data_test.Y)
-    eval_on_pixels(data_test, [svm.predict(x) for x in X_features])
+    eval_on_pixels(data_test, [svm.predict(chi2.transform(x)) for x in
+                               X_features])
     #plot_results(data_test, [svm.predict(x) for x in X_features],
                  #folder="probs_100_linear_svc_0.1")
+    return svm
 
 
 def main():
     # load training data
+    #independent = True
     independent = False
-    test = True
-    with open("../superpixel_crf/data_probs_train_cw_trainval.pickle") as f:
+    test = False
+    #with open("../superpixel_crf/data_probs_train_cw_trainval.pickle") as f:
+    with open("../superpixel_crf/data_train_1000_color.pickle") as f:
         data_train = cPickle.load(f)
     #data_train = load_stacked_results()
 
@@ -145,21 +157,22 @@ def main():
         #data_val = cPickle.load(f)
     #data_train = load_data("train", independent=independent)
     data_train = add_edges(data_train, independent=independent)
-    data_train = add_kraehenbuehl_features(data_train)
+    #data_train = add_kraehenbuehl_features(data_train)
 
     data_train = discard_void(data_train, 21)
     if not independent:
         data_train = add_edge_features(data_train)
     X_, Y_ = data_train.X, data_train.Y
-    #chi2 = AdditiveChi2Sampler(sample_steps=2)
-    #X_ = [(chi2.fit_transform(x[0]), x[1]) for x in X_]
+    chi2 = AdditiveChi2Sampler(sample_steps=2)
+    X_ = [(chi2.fit_transform(x[0]), x[1]) for x in X_]
 
     if test:
-        with open("../superpixel_crf/data_probs_val_cw_trainval.pickle") as f:
+        #with open("../superpixel_crf/data_probs_val_cw_trainval.pickle") as f:
+        with open("../superpixel_crf/data_val_1000_color.pickle") as f:
             data_val = cPickle.load(f)
         #data_val = load_data("val", independent=independent)
         data_val = add_edges(data_val, independent=independent)
-        data_val = add_kraehenbuehl_features(data_val)
+        #data_val = add_kraehenbuehl_features(data_val)
         data_val = discard_void(data_val, 21)
         if not independent:
             data_val = add_edge_features(data_val)
@@ -175,7 +188,7 @@ def main():
     print(class_weights)
     problem = crfs.GraphCRF(n_states=n_states, n_features=X_[0][0].shape[1],
                             inference_method='qpbo',
-                            class_weight=class_weights)
+                            class_weight=class_weights, rescale_C=True)
     #problem = crfs.EdgeFeatureGraphCRF(n_states=n_states,
                                        #n_features=X_[0][0].shape[1],
                                        #inference_method='qpbo',
@@ -183,29 +196,30 @@ def main():
                                        #n_edge_features=3,
                                        #symmetric_edge_features=[0, 1],
                                        #antisymmetric_edge_features=[2])
-    experiment_name = "piecewise_std_graph_kraehenbuehl_.01_trainval"
+    experiment_name = "full_features_chi2_graph_.01_rescale_C"
     #ssvm = learners.SubgradientSSVM(
         #problem, verbose=2, C=0.1, n_jobs=-1, max_iter=100000,
         #learning_rate=0.001, show_loss_every=10, decay_exponent=0.5,
         #momentum=0.0,
         #logger=SaveLogger(experiment_name + ".pickle", save_every=10))
     ssvm = learners.OneSlackSSVM(
-        problem, verbose=2, C=0.01, max_iter=100000, n_jobs=-1,
-        tol=0.0001, show_loss_every=50, inference_cache=50, cache_tol='auto',
+        problem, verbose=3, C=.01, max_iter=100000, n_jobs=-1,
+        tol=0.001, show_loss_every=50, inference_cache=50, cache_tol='auto',
         logger=SaveLogger(experiment_name + ".pickle", save_every=100),
-        inactive_threshold=1e-5, break_on_bad=False)
+        inactive_threshold=1e-5, break_on_bad=False, inactive_window=50)
     #ssvm = SaveLogger(experiment_name + ".pickle").load()
     #ssvm.logger = SaveLogger(
         #file_name=experiment_name + "_refit.pickle",
         #save_every=100)
-    #ssvm.n_jobs = 5
     #ssvm.problem.class_weight = np.ones(ssvm.problem.n_states)
-    #ssvm.problem.inference_method = 'lp'
-    #ssvm.tol = -10
-    #ssvm.fit(X_, Y_, warm_start=True)
+    #ssvm.problem.inference_method = 'ogm'
+    #ssvm.n_jobs = 1
+    #ssvm.inference_cache = 0
     #from sklearn.utils import shuffle
     #X_shuffled, Y_shuffled = shuffle(X_, Y_)
     #ssvm.fit(X_shuffled, Y_shuffled)
+    #ssvm.problem.rescale_C = False
+    #ssvm.fit(X_, Y_, warm_start=True)
     ssvm.fit(X_, Y_)
     print("fit finished!")
     tracer()
