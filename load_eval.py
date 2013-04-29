@@ -11,8 +11,7 @@ from pystruct.utils import SaveLogger
 from pystruct.problems import LatentNodeCRF, EdgeFeatureGraphCRF
 
 from msrc_first_try import eval_on_pixels
-from msrc_helpers import (plot_results, add_edge_features, add_edges,
-                          transform_chi2)
+from msrc_helpers import plot_results, add_edge_features, add_edges
 from hierarchical_crf import make_hierarchical_data
 from hierarchical_segmentation import plot_results_hierarchy
 
@@ -50,10 +49,11 @@ def main():
             print(title)
             #independent = True
             independent = False
+            #with open("/home/user/amueller/checkout/superpixel_crf/"
+                      #"data_%s_1000_color.pickle" % data_str) as f:
             with open("/home/user/amueller/checkout/superpixel_crf/"
-                      "data_%s_1000_color.pickle" % data_str) as f:
-            #with open("../superpixel_crf/data_probs_%s_cw_trainval.pickle"
-                      #% data_str) as f:
+                      "data_probs_%s_cw_trainval.pickle"
+                      % data_str) as f:
                 data = cPickle.load(f)
             if isinstance(ssvm.problem, EdgeFeatureGraphCRF):
                 independent = False
@@ -63,9 +63,9 @@ def main():
                 print("DAI DAI DAI")
             #data = load_stacked_results(data_str)
             data = add_edges(data, independent=independent)
-            data = transform_chi2(data)
+            #data = transform_chi2(data)
             #data = load_data(data_str, independent=False)
-            #data = add_kraehenbuehl_features(data)
+            data = add_kraehenbuehl_features(data)
             if isinstance(ssvm.problem, EdgeFeatureGraphCRF):
                 data = add_edge_features(data)
 
