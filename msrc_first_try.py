@@ -17,7 +17,7 @@ from msrc_helpers import (classes, load_data, plot_results, discard_void,
                           eval_on_pixels, add_edge_features, add_edges,
                           DataBunch)
 
-#from kraehenbuehl_potentials import add_kraehenbuehl_features
+from kraehenbuehl_potentials import add_kraehenbuehl_features
 
 
 from IPython.core.debugger import Tracer
@@ -148,8 +148,9 @@ def main():
     #independent = True
     independent = False
     test = False
-    #with open("../superpixel_crf/data_probs_train_cw_trainval.pickle") as f:
-    with open("../superpixel_crf/data_train_1000_color.pickle") as f:
+    with open("../superpixel_crf/data_probs_train_cw_trainval.pickle") as f:
+    #with open("/home/user/amueller/checkout/superpixel_crf/"
+              #"data_train_1000_color.pickle") as f:
         data_train = cPickle.load(f)
     #data_train = load_stacked_results()
 
@@ -157,7 +158,7 @@ def main():
         #data_val = cPickle.load(f)
     #data_train = load_data("train", independent=independent)
     data_train = add_edges(data_train, independent=independent)
-    #data_train = add_kraehenbuehl_features(data_train)
+    data_train = add_kraehenbuehl_features(data_train)
 
     data_train = discard_void(data_train, 21)
     if not independent:
@@ -183,28 +184,29 @@ def main():
     n_states = 21
     print("number of samples: %s" % len(data_train.X))
     class_weights = 1. / np.bincount(np.hstack(Y_))
+    #class_weights[21] = 0
     class_weights *= 21. / np.sum(class_weights)
     #class_weights = np.ones(n_states)
     print(class_weights)
-    problem = crfs.GraphCRF(n_states=n_states, n_features=X_[0][0].shape[1],
-                            inference_method='qpbo',
-                            class_weight=class_weights, rescale_C=True)
-    #problem = crfs.EdgeFeatureGraphCRF(n_states=n_states,
-                                       #n_features=X_[0][0].shape[1],
-                                       #inference_method='qpbo',
-                                       #class_weight=class_weights,
-                                       #n_edge_features=3,
-                                       #symmetric_edge_features=[0, 1],
-                                       #antisymmetric_edge_features=[2])
-    experiment_name = "full_features_chi2_graph_.01_rescale_C"
+    #problem = crfs.GraphCRF(n_states=n_states, n_features=X_[0][0].shape[1],
+                            #inference_method='qpbo',
+                            #class_weight=class_weights, rescale_C=True)
+    problem = crfs.EdgeFeatureGraphCRF(n_states=n_states,
+                                       n_features=X_[0][0].shape[1],
+                                       inference_method='qpbo',
+                                       class_weight=class_weights,
+                                       n_edge_features=3,
+                                       symmetric_edge_features=[0, 1],
+                                       antisymmetric_edge_features=[2])
+    experiment_name = "redo_edge_features_0.05"
     #ssvm = learners.SubgradientSSVM(
         #problem, verbose=2, C=0.1, n_jobs=-1, max_iter=100000,
         #learning_rate=0.001, show_loss_every=10, decay_exponent=0.5,
         #momentum=0.0,
         #logger=SaveLogger(experiment_name + ".pickle", save_every=10))
     ssvm = learners.OneSlackSSVM(
-        problem, verbose=3, C=.01, max_iter=100000, n_jobs=-1,
-        tol=0.001, show_loss_every=50, inference_cache=50, cache_tol='auto',
+        problem, verbose=3, C=.05, max_iter=100000, n_jobs=-1,
+        tol=0.001, show_loss_every=50, inference_cache=10, cache_tol='auto',
         logger=SaveLogger(experiment_name + ".pickle", save_every=100),
         inactive_threshold=1e-5, break_on_bad=False, inactive_window=50)
     #ssvm = SaveLogger(experiment_name + ".pickle").load()
@@ -212,7 +214,7 @@ def main():
         #file_name=experiment_name + "_refit.pickle",
         #save_every=100)
     #ssvm.problem.class_weight = np.ones(ssvm.problem.n_states)
-    #ssvm.problem.inference_method = 'ogm'
+    #ssvm.problem.inference_method = 'ad3'
     #ssvm.n_jobs = 1
     #ssvm.inference_cache = 0
     #from sklearn.utils import shuffle
@@ -222,6 +224,7 @@ def main():
     #ssvm.fit(X_, Y_, warm_start=True)
     ssvm.fit(X_, Y_)
     print("fit finished!")
+    return
     tracer()
 
     # do some evaluation on the training set

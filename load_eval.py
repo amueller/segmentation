@@ -50,8 +50,8 @@ def main():
             print(title)
             #independent = True
             independent = False
-            with open("../superpixel_crf/data_%s_1000_color.pickle"
-                      % data_str) as f:
+            with open("/home/user/amueller/checkout/superpixel_crf/"
+                      "data_%s_1000_color.pickle" % data_str) as f:
             #with open("../superpixel_crf/data_probs_%s_cw_trainval.pickle"
                       #% data_str) as f:
                 data = cPickle.load(f)
