@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 
 from sklearn.externals.joblib import Memory
 #from sklearn.metrics import confusion_matrix
+from sklearn.kernel_approximation import AdditiveChi2Sampler
 
 from pystruct.utils import make_grid_edges
 
@@ -139,8 +140,20 @@ def add_edges(data, independent=False):
     if independent:
         X_new = [(x, np.empty((0, 2), dtype=np.int)) for x in data.X]
     else:
-        X_new = [(x, region_graph(sp)) for x, sp in zip(data.X,
-                                                        data.superpixels)]
+        X_new = [(x, np.sort(region_graph(sp), axis=-1))
+                 for x, sp in zip(data.X, data.superpixels)]
+
+    return DataBunch(X_new, data.Y, data.file_names, data.superpixels)
+
+
+def transform_chi2(data):
+    chi2 = AdditiveChi2Sampler(sample_steps=2)
+    if len(data.X[0]) == 2:
+        X_new = [(chi2.fit_transform(x[0]), x[1]) for x in data.X]
+    elif len(data.X[0]) == 3:
+        X_new = [(chi2.fit_transform(x[0]), x[1], x[2]) for x in data.X]
+    else:
+        raise ValueError("len(x) is weird: %d" % len(data.X[0]))
 
     return DataBunch(X_new, data.Y, data.file_names, data.superpixels)
 
