@@ -146,9 +146,12 @@ def add_edges(data, independent=False):
     return DataBunch(X_new, data.Y, data.file_names, data.superpixels)
 
 
+@memory.cache
 def transform_chi2(data):
     chi2 = AdditiveChi2Sampler(sample_steps=2)
-    if len(data.X[0]) == 2:
+    if isinstance(data.X[0], np.ndarray):
+        X_new = [chi2.fit_transform(x) for x in data.X]
+    elif len(data.X[0]) == 2:
         X_new = [(chi2.fit_transform(x[0]), x[1]) for x in data.X]
     elif len(data.X[0]) == 3:
         X_new = [(chi2.fit_transform(x[0]), x[1], x[2]) for x in data.X]
@@ -158,7 +161,12 @@ def transform_chi2(data):
     return DataBunch(X_new, data.Y, data.file_names, data.superpixels)
 
 
+@memory.cache
 def discard_void(data, void_label=21):
+    if isinstance(data.X[0], np.ndarray):
+        mask = data.Y != void_label
+        return DataBunch(data.X[mask], data.Y[mask], data.file_names,
+                         data.superpixels)
     X_new, Y_new = [], []
     for x, y in zip(data.X, data.Y):
         mask = y != void_label
@@ -166,9 +174,11 @@ def discard_void(data, void_label=21):
 
         if len(x) == 2:
             features, edges = x
-        else:
+        elif len(x) == 3:
             features, edges, n_hidden = x
             mask = np.hstack([mask, np.ones(n_hidden, dtype=np.bool)])
+        else:
+            raise ValueError("len(x) is weird: %d" % len(data.X[0]))
 
         edges_new = edges
         if edges_new.shape[0] > 0:

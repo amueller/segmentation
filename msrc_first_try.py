@@ -15,7 +15,7 @@ from pystruct.utils import SaveLogger
 
 from msrc_helpers import (classes, load_data, plot_results, discard_void,
                           eval_on_pixels, add_edge_features, add_edges,
-                          DataBunch)
+                          DataBunch, transform_chi2)
 
 from kraehenbuehl_potentials import add_kraehenbuehl_features
 
@@ -83,19 +83,21 @@ def train_svm(test=False, C=0.01):
     #data_train = load_stacked_results()
     with open("../superpixel_crf/data_train_1000_color.pickle") as f:
         data_train = cPickle.load(f)
+    data_train = transform_chi2(data_train)
+    data_train_novoid = discard_void(data_train, 21)
     #data_train = load_data("train", independent=True)
     #data_train = add_kraehenbuehl_features(data_train)
     #X_features = [x[0] for x in data_train.X]
-    X_features = data_train.X
-    X_features_flat = np.vstack(X_features)
-    y = np.hstack(data_train.Y)
+    X_features_flat = np.vstack(data_train_novoid.X)
+    y = np.hstack(data_train_novoid.Y)
     if test:
         data_val = load_stacked_results('val')
         #data_val = load_data("val", independent=True)
         #data_val = add_kraehenbuehl_features(data_val)
+        data_val = transform_chi2(data_val)
+        data_val_novoid = discard_void(data_val, 21)
         #X_features_val = [x[0] for x in data_val.X]
-        X_features_val = data_val.X
-        X_features_flat_val = np.vstack(X_features_val)
+        X_features_flat_val = np.vstack(data_val_novoid)
         y_val = np.hstack(data_val.Y)
         y = np.hstack([y, y_val])
         X_features_flat = np.vstack([X_features_flat, X_features_flat_val])
@@ -103,24 +105,25 @@ def train_svm(test=False, C=0.01):
     #svm = LinearSVC(C=C, dual=False,
                     #multi_class='crammer_singer', fit_intercept=False,
                     #verbose=10, class_weight='auto')
+    from sklearn.svm import SVC
+    svm = SVC()
     #from sklearn.linear_model import LogisticRegression
     #svm = LogisticRegression(C=.5, dual=False, class_weight='auto')
     #from pystruct.learners import OneSlackSSVM
-    class_weight = 1. / np.bincount(y)
-    class_weight *= len(class_weight) / np.sum(class_weight)
-    pbl = crfs.CrammerSingerSVMProblem(n_classes=21, n_features=3 *
-                                       X_features_flat.shape[1],
-                                       class_weight=class_weight[:-1],
-                                       rescale_C=True)
-    svm = learners.OneSlackSSVM(pbl, n_jobs=1, verbose=2, max_iter=100000,
-                                C=C, show_loss_every=50, tol=0.001,
-                                inactive_threshold=1e-4, inactive_window=50,
-                                check_constraints=True, break_on_bad=True)
-    chi2 = AdditiveChi2Sampler(sample_steps=2)
-    svm.fit(chi2.fit_transform(X_features_flat[y != 21]), y[y != 21])
+    #class_weight = 1. / np.bincount(y)
+    #class_weight *= len(class_weight) / np.sum(class_weight)
+    #pbl = crfs.CrammerSingerSVMProblem(n_classes=21, n_features=3 *
+                                       #X_features_flat.shape[1],
+                                       #class_weight=class_weight[:-1],
+                                       #rescale_C=True)
+    #svm = learners.OneSlackSSVM(pbl, n_jobs=1, verbose=2, max_iter=100000,
+                                #C=C, show_loss_every=50, tol=0.001,
+                                #inactive_threshold=1e-4, inactive_window=50,
+                                #check_constraints=True, break_on_bad=True)
+    svm.fit(np.vstack(data_train.X), np.hstack(data_train.Y))
 
-    eval_on_pixels(data_train, [svm.predict(chi2.transform(x)) for x in
-                                X_features])
+    eval_on_pixels(data_train, [svm.predict(x) for x in
+                                data_train.X])
 
     if test:
         #data_test = load_data("test", independent=True)
@@ -134,10 +137,10 @@ def train_svm(test=False, C=0.01):
     #data_test = add_kraehenbuehl_features(data_test)
 
     #X_features = [x[0] for x in data_test.X]
-    X_features = data_test.X
+    data_test = transform_chi2(data_test)
     y = np.hstack(data_test.Y)
-    eval_on_pixels(data_test, [svm.predict(chi2.transform(x)) for x in
-                               X_features])
+    eval_on_pixels(data_test, [svm.predict(x) for x in
+                               data_test.X])
     #plot_results(data_test, [svm.predict(x) for x in X_features],
                  #folder="probs_100_linear_svc_0.1")
     return svm
