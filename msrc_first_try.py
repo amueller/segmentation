@@ -1,59 +1,22 @@
 import cPickle
 
 import numpy as np
-import matplotlib.pyplot as plt
-
-from sklearn.kernel_approximation import AdditiveChi2Sampler
 
 from datasets.msrc import MSRCDataset
 from pystruct import learners
-from pystruct.problems.latent_graph_crf import kmeans_init
 #from pystruct.problems import EdgeFeatureGraphCRF
 #from pystruct.problems import GraphCRF
 import pystruct.problems as crfs
 from pystruct.utils import SaveLogger
 
-from msrc_helpers import (classes, load_data, plot_results, discard_void,
-                          eval_on_pixels, add_edge_features, add_edges,
-                          DataBunch, transform_chi2, SimpleSplitCV)
+from msrc_helpers import (discard_void, eval_on_pixels, add_edge_features,
+                          add_edges, DataBunch, transform_chi2, SimpleSplitCV)
 
 from kraehenbuehl_potentials import add_kraehenbuehl_features
 
 
 from IPython.core.debugger import Tracer
 tracer = Tracer()
-
-
-def plot_confusion_matrix(matrix, title=None):
-    plt.matshow(matrix)
-    plt.axis("off")
-    plt.colorbar()
-    for i, c in enumerate(classes[:-2]):
-        plt.text(i, -1, c, rotation=60, va='bottom')
-        plt.text(-1, i, c, ha='right')
-    if title:
-        plt.title(title)
-
-
-def plot_parts():
-    car_idx = np.where(classes == "car")[0]
-    data = load_data("train", independent=False)
-    car_images = np.array([i for i, y in enumerate(data.Y)
-                           if np.any(y == car_idx)])
-    flat_X = [x[0] for x in data.X]
-    edges = [[x[1]] for x in data.X]
-    n_states_per_label = np.ones(22, dtype=np.int)
-    n_states_per_label[car_idx] = 6
-
-    H = kmeans_init(flat_X, data.Y, edges, n_labels=22,
-                    n_states_per_label=n_states_per_label, symmetric=True)
-    X, Y, file_names, images, all_superpixels, H = zip(*[
-        (data.X[i], data.Y[i], data.file_names[i], data.images[i],
-         data.all_superpixels[i], H[i])
-        for i in car_images])
-    plot_results(images, file_names, Y, H, all_superpixels,
-                 folder="test_parts", use_colors_predict=False)
-    tracer()
 
 
 def sigm(x):
@@ -80,7 +43,8 @@ def load_stacked_results(ds='train', path='../superpixel_crf/blub2/'):
 
 def train_svm(test=False, C=0.01):
     #data_train = load_stacked_results()
-    with open("../superpixel_crf/data_train_1000_color.pickle") as f:
+    with open("/home/user/amueller/checkout/superpixel_crf/"
+              "data_train_1000_color.pickle") as f:
         data_train = cPickle.load(f)
     data_train = transform_chi2(data_train)
     data_train_novoid = discard_void(data_train, 21)
@@ -91,7 +55,8 @@ def train_svm(test=False, C=0.01):
     y = np.hstack(data_train_novoid.Y)
     cv = 3
     if test:
-        with open("../superpixel_crf/data_val_1000_color.pickle") as f:
+        with open("/home/user/amueller/checkout/superpixel_crf/"
+                  "data_val_1000_color.pickle") as f:
             data_val = cPickle.load(f)
         #data_val = add_kraehenbuehl_features(data_val)
         data_val = transform_chi2(data_val)
@@ -122,12 +87,14 @@ def train_svm(test=False, C=0.01):
 
     if test:
         #data_test = load_data("test", independent=True)
-        with open("../superpixel_crf/data_test_1000_color.pickle") as f:
+        with open("/home/user/amueller/checkout/superpixel_crf/"
+                  "data_test_1000_color.pickle") as f:
             data_test = cPickle.load(f)
     else:
         #data_test = load_data("val", independent=True)
         #data_test = load_stacked_results('val')
-        with open("../superpixel_crf/data_val_1000_color.pickle") as f:
+        with open("/home/user/amueller/checkout/superpixel_crf/"
+                  "data_val_1000_color.pickle") as f:
             data_test = cPickle.load(f)
 
     #data_test = add_kraehenbuehl_features(data_test)

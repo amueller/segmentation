@@ -321,3 +321,14 @@ def get_edge_directions(edges, superpixels):
         diff /= np.linalg.norm(diff)
         directions.append(np.arcsin(diff[1]))
     return np.vstack(directions)
+
+
+def plot_confusion_matrix(matrix, title=None):
+    plt.matshow(matrix)
+    plt.axis("off")
+    plt.colorbar()
+    for i, c in enumerate(classes[:-2]):
+        plt.text(i, -1, c, rotation=60, va='bottom')
+        plt.text(-1, i, c, ha='right')
+    if title:
+        plt.title(title)

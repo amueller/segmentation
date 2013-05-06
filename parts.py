@@ -12,6 +12,27 @@ from IPython.core.debugger import Tracer
 tracer = Tracer()
 
 
+def plot_parts():
+    from pystruct.problems.latent_graph_crf import kmeans_init
+    car_idx = np.where(classes == "car")[0]
+    data = load_data("train", independent=False)
+    car_images = np.array([i for i, y in enumerate(data.Y)
+                           if np.any(y == car_idx)])
+    flat_X = [x[0] for x in data.X]
+    edges = [[x[1]] for x in data.X]
+    n_states_per_label = np.ones(22, dtype=np.int)
+    n_states_per_label[car_idx] = 6
+
+    H = kmeans_init(flat_X, data.Y, edges, n_labels=22,
+                    n_states_per_label=n_states_per_label, symmetric=True)
+    X, Y, file_names, images, all_superpixels, H = zip(*[
+        (data.X[i], data.Y[i], data.file_names[i], data.images[i],
+         data.all_superpixels[i], H[i])
+        for i in car_images])
+    plot_results(images, file_names, Y, H, all_superpixels,
+                 folder="test_parts", use_colors_predict=False)
+
+
 def train_car_parts():
     car_idx = np.where(classes == "car")[0]
     data = load_data("train", independent=False)
