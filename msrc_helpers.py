@@ -23,6 +23,19 @@ base_path = "/home/user/amueller/datasets/aurelien_msrc_features/msrc/"
 memory = Memory(cachedir="/tmp/cache")
 
 
+class SimpleSplitCV():
+    def __init__(self, n_train, n_test):
+        self.n_train = n_train
+        self.n_test = n_test
+
+    def __iter__(self):
+        mask_train = np.zeros(self.n_train + self.n_test, dtype=np.bool)
+        mask_test = mask_train.copy()
+        mask_train[:self.n_train] = True
+        mask_test[self.n_train:] = True
+        yield mask_train, mask_test
+
+
 @memory.cache
 def load_data(dataset="train", independent=False):
     mountain_idx = np.where(classes == "mountain")[0]
@@ -164,8 +177,9 @@ def transform_chi2(data):
 @memory.cache
 def discard_void(data, void_label=21):
     if isinstance(data.X[0], np.ndarray):
-        mask = data.Y != void_label
-        return DataBunch(data.X[mask], data.Y[mask], data.file_names,
+        X_new = [x[y != void_label] for x, y in zip(data.X, data.Y)]
+        Y_new = [y[y != void_label] for y in data.Y]
+        return DataBunch(X_new, Y_new, data.file_names,
                          data.superpixels)
     X_new, Y_new = [], []
     for x, y in zip(data.X, data.Y):
@@ -205,7 +219,9 @@ def discard_void(data, void_label=21):
 
 
 def load_kraehenbuehl(filename):
-    path = "/home/user/amueller/datasets/kraehenbuehl_potentials_msrc/out/"
+    #path = "/home/user/amueller/datasets/kraehenbuehl_potentials_msrc/out/"
+    path = ("/home/user/amueller/datasets/kraehenbuehl_potentials_msrc/"
+            "textonboost_trainval/")
     #path = "/home/local/datasets/MSRC_ObjCategImageDatabase_v2/asdf/"
     with open(path + filename + ".unary") as f:
         size = np.fromfile(f, dtype=np.uint32, count=3).byteswap()
@@ -220,6 +236,13 @@ def get_kraehenbuehl_pot_sp(data):
     for x, filename, superpixels in zip(data.X, data.file_names,
                                         data.superpixels):
         probs = load_kraehenbuehl(filename)
+        #if np.min(probs) < 0:
+        if True:
+            # softmax normalization
+            probs -= np.max(probs, axis=-1)[:, :, np.newaxis]
+            probs = np.exp(probs)
+            probs /= probs.sum(axis=-1)[:, :, np.newaxis]
+
         # accumulate votes in superpixels
         # interleaved repeat
         class_indices = np.repeat(np.arange(21)[np.newaxis, :],
