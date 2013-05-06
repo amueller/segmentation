@@ -15,7 +15,7 @@ from pystruct.utils import SaveLogger
 
 from msrc_helpers import (classes, load_data, plot_results, discard_void,
                           eval_on_pixels, add_edge_features, add_edges,
-                          DataBunch, transform_chi2)
+                          DataBunch, transform_chi2, SimpleSplitCV)
 
 from kraehenbuehl_potentials import add_kraehenbuehl_features
 
@@ -79,7 +79,6 @@ def load_stacked_results(ds='train', path='../superpixel_crf/blub2/'):
 
 
 def train_svm(test=False, C=0.01):
-
     #data_train = load_stacked_results()
     with open("../superpixel_crf/data_train_1000_color.pickle") as f:
         data_train = cPickle.load(f)
@@ -90,44 +89,41 @@ def train_svm(test=False, C=0.01):
     #X_features = [x[0] for x in data_train.X]
     X_features_flat = np.vstack(data_train_novoid.X)
     y = np.hstack(data_train_novoid.Y)
+    cv = 3
     if test:
-        data_val = load_stacked_results('val')
-        #data_val = load_data("val", independent=True)
+        with open("../superpixel_crf/data_val_1000_color.pickle") as f:
+            data_val = cPickle.load(f)
         #data_val = add_kraehenbuehl_features(data_val)
         data_val = transform_chi2(data_val)
         data_val_novoid = discard_void(data_val, 21)
         #X_features_val = [x[0] for x in data_val.X]
-        X_features_flat_val = np.vstack(data_val_novoid)
-        y_val = np.hstack(data_val.Y)
+        X_features_flat_val = np.vstack(data_val_novoid.X)
+        y_val = np.hstack(data_val_novoid.Y)
         y = np.hstack([y, y_val])
         X_features_flat = np.vstack([X_features_flat, X_features_flat_val])
+        #cv = SimpleSplitCV(len(y) - len(y_val), len(y_val))
     #from sklearn.svm import LinearSVC
     #svm = LinearSVC(C=C, dual=False,
                     #multi_class='crammer_singer', fit_intercept=False,
                     #verbose=10, class_weight='auto')
     from sklearn.svm import SVC
-    svm = SVC()
-    #from sklearn.linear_model import LogisticRegression
-    #svm = LogisticRegression(C=.5, dual=False, class_weight='auto')
-    #from pystruct.learners import OneSlackSSVM
-    #class_weight = 1. / np.bincount(y)
-    #class_weight *= len(class_weight) / np.sum(class_weight)
-    #pbl = crfs.CrammerSingerSVMProblem(n_classes=21, n_features=3 *
-                                       #X_features_flat.shape[1],
-                                       #class_weight=class_weight[:-1],
-                                       #rescale_C=True)
-    #svm = learners.OneSlackSSVM(pbl, n_jobs=1, verbose=2, max_iter=100000,
-                                #C=C, show_loss_every=50, tol=0.001,
-                                #inactive_threshold=1e-4, inactive_window=50,
-                                #check_constraints=True, break_on_bad=True)
+    svm = SVC(kernel='rbf', class_weight='auto', C=10, gamma=.1,
+              shrinking=False)
     svm.fit(np.vstack(data_train.X), np.hstack(data_train.Y))
+    #from sklearn.grid_search import GridSearchCV
+    #grid = GridSearchCV(svm, param_grid={'C': 10. ** np.arange(1, 4), 'gamma':
+                                         #10. ** np.arange(-3, 1)}, verbose=10,
+                        #n_jobs=1, cv=cv)
+    #grid.fit(X_features_flat, y)
+    tracer()
 
     eval_on_pixels(data_train, [svm.predict(x) for x in
                                 data_train.X])
 
     if test:
         #data_test = load_data("test", independent=True)
-        data_test = load_stacked_results('test')
+        with open("../superpixel_crf/data_test_1000_color.pickle") as f:
+            data_test = cPickle.load(f)
     else:
         #data_test = load_data("val", independent=True)
         #data_test = load_stacked_results('val')
