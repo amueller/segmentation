@@ -151,7 +151,7 @@ def plot_results(data, Y_pred, folder="figures", use_colors_predict=True):
 def concatenate_datasets(data1, data2):
     X = data1.X + data2.X
     Y = data1.Y + data2.Y
-    file_names = data1.file_names + data2.file_name
+    file_names = np.hstack([data1.file_names, data2.file_names])
     superpixels = data1.superpixels + data2.superpixels
     return DataBunch(X, Y, file_names, superpixels)
 
