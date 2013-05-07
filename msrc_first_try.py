@@ -2,7 +2,6 @@ import cPickle
 
 import numpy as np
 
-from datasets.msrc import MSRCDataset
 from pystruct import learners
 #from pystruct.problems import EdgeFeatureGraphCRF
 #from pystruct.problems import GraphCRF
@@ -10,9 +9,9 @@ import pystruct.problems as crfs
 from pystruct.utils import SaveLogger
 
 from msrc_helpers import (discard_void, eval_on_pixels, add_edge_features,
-                          add_edges, DataBunch, transform_chi2,
+                          add_edges, transform_chi2,
                           concatenate_datasets)
-#from msrc_helpers import SimpleSplitCV
+from msrc_helpers import SimpleSplitCV
 
 from kraehenbuehl_potentials import add_kraehenbuehl_features
 
@@ -27,22 +26,6 @@ def sigm(x):
     return x
 
 
-def load_stacked_results(ds='train', path='../superpixel_crf/blub2/'):
-    #path = "../superpixel_crf/blub2/"
-    #path = "../superpixel_crf/logreg_C10_v10/"
-    msrc = MSRCDataset()
-    files = msrc.get_split(ds)
-    X = []
-    for f in files:
-        probs = np.load(path + f + "_probs.npy")
-        X.append(sigm(probs))
-    with open("../superpixel_crf/data_probs_%s_cw.pickle"
-              % ds) as f:
-        data = cPickle.load(f)
-    assert(np.all(data.file_names == files))
-    return DataBunch(X, data.Y, files, data.superpixels)
-
-
 def train_svm(test=False, C=0.01):
     #data_train = load_stacked_results()
     with open("/home/user/amueller/checkout/superpixel_crf/"
@@ -54,10 +37,10 @@ def train_svm(test=False, C=0.01):
         with open("/home/user/amueller/checkout/superpixel_crf/"
                   "data_val_1000_color.pickle") as f:
             data_val = cPickle.load(f)
+        n_samples_train = len(np.hstack(data_train.Y))
+        n_samples_val = len(np.hstack(data_val.Y))
+        cv = SimpleSplitCV(n_samples_train, n_samples_val)
         data_train = concatenate_datasets(data_train, data_val)
-
-        #cv = SimpleSplitCV(len(data_train.Y) - len(data_val.Y),
-                           #len(data_val.Y))
 
     data_train = transform_chi2(data_train)
     data_train_novoid = discard_void(data_train, 21)
@@ -71,12 +54,13 @@ def train_svm(test=False, C=0.01):
     from sklearn.svm import SVC
     svm = SVC(kernel='rbf', class_weight='auto', C=10, gamma=.1,
               shrinking=False)
-    svm.fit(np.vstack(data_train_novoid.X), np.hstack(data_train_novoid.Y))
-    #from sklearn.grid_search import GridSearchCV
-    #grid = GridSearchCV(svm, param_grid={'C': 10. ** np.arange(1, 4), 'gamma':
-                                         #10. ** np.arange(-3, 1)}, verbose=10,
-                        #n_jobs=1, cv=cv)
-    #grid.fit(X_features_flat, y)
+    #svm.fit(np.vstack(data_train_novoid.X), np.hstack(data_train_novoid.Y))
+    from sklearn.grid_search import GridSearchCV
+    grid = GridSearchCV(svm, param_grid={'C': 10. ** np.arange(4, 7), 'gamma':
+                                         10. ** np.arange(-5, 1)}, verbose=10,
+                        n_jobs=1, cv=cv, refit=False)
+    grid.fit(np.vstack(data_train_novoid.X), np.hstack(data_train_novoid.Y))
+    tracer()
 
     eval_on_pixels(data_train, [svm.predict(x) for x in
                                 data_train.X])
