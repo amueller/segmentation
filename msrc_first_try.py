@@ -26,7 +26,7 @@ def sigm(x):
     return x
 
 
-def train_svm(test=False, C=0.01):
+def train_svm(test=False, C=0.01, gamma=.1):
     #data_train = load_stacked_results()
     with open("/home/user/amueller/checkout/superpixel_crf/"
               "data_train_1000_color.pickle") as f:
@@ -52,19 +52,18 @@ def train_svm(test=False, C=0.01):
                     #multi_class='crammer_singer', fit_intercept=False,
                     #verbose=10, class_weight='auto')
     from sklearn.svm import SVC
-    svm = SVC(kernel='rbf', class_weight='auto', C=10, gamma=.1,
-              shrinking=False)
-    #svm.fit(np.vstack(data_train_novoid.X), np.hstack(data_train_novoid.Y))
-    from sklearn.grid_search import GridSearchCV
-    grid = GridSearchCV(svm, param_grid={'C': 10. ** np.arange(4, 7), 'gamma':
-                                         10. ** np.arange(-5, 1)}, verbose=10,
-                        n_jobs=1, cv=cv, refit=False)
-    grid.fit(np.vstack(data_train_novoid.X), np.hstack(data_train_novoid.Y))
-    tracer()
+    svm = SVC(kernel='rbf', class_weight='auto', C=C, gamma=gamma,
+              shrinking=False, cache_size=5000)
+    print(svm)
+    svm.fit(np.vstack(data_train_novoid.X), np.hstack(data_train_novoid.Y))
+    #from sklearn.grid_search import GridSearchCV
+    #grid = GridSearchCV(svm, param_grid={'C': 10. ** np.arange(1, 4), 'gamma':
+                                         #10. ** np.arange(-3, 1)}, verbose=10,
+                        #n_jobs=1, cv=cv)
+    #grid.fit(X_features_flat, y)
 
     eval_on_pixels(data_train, [svm.predict(x) for x in
                                 data_train.X])
-    tracer()
 
     if test:
         #data_test = load_data("test", independent=True)
@@ -86,7 +85,6 @@ def train_svm(test=False, C=0.01):
                                data_test.X])
     #plot_results(data_test, [svm.predict(x) for x in X_features],
                  #folder="probs_100_linear_svc_0.1")
-    tracer()
     return svm
 
 
