@@ -2,6 +2,8 @@ from collections import namedtuple
 import os
 from glob import glob
 
+import cPickle
+
 import numpy as np
 from scipy.misc import imread
 from scipy import sparse
@@ -36,8 +38,22 @@ class SimpleSplitCV():
         yield mask_train, mask_test
 
 
-@memory.cache
-def load_data(dataset="train", independent=False):
+def load_data(dataset="train", which="bow"):
+    if which == "bow":
+        filename = ("/home/user/amueller/checkout/superpixel_crf/"
+                    "data_%s_1000_color.pickle" % dataset)
+    elif which == "piecewise":
+        filename = ("/home/user/amueller/checkout/superpixel_crf/"
+                    "data_probs_%_cw.pickle" % dataset)
+    else:
+        raise ValueError("'which' should be 'bow' or 'piecewise'")
+
+    with open(filename) as f:
+            data = cPickle.load(f)
+    return data
+
+
+def load_data_aurelien(dataset="train", independent=False):
     mountain_idx = np.where(classes == "mountain")[0]
     horse_idx = np.where(classes == "horse")[0]
     void_idx = np.where(classes == "void")[0]
