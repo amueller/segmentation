@@ -25,6 +25,17 @@ base_path = "/home/user/amueller/datasets/aurelien_msrc_features/msrc/"
 memory = Memory(cachedir="/tmp/cache")
 
 
+class PixelwiseScorer(object):
+    def __init__(self, data):
+        self.data = data
+        self.greater_is_better = True
+
+    def __call__(self, estimator, X, y):
+        result = eval_on_pixels(self.data,
+                                [estimator.predict(x) for x in self.data.X])
+        return result['average']
+
+
 class SimpleSplitCV():
     def __init__(self, n_train, n_test):
         self.n_train = n_train
@@ -242,10 +253,14 @@ def discard_void(data, void_label=21):
     return DataBunch(X_new, Y_new, data.file_names, data.superpixels)
 
 
-def load_kraehenbuehl(filename):
-    #path = "/home/user/amueller/datasets/kraehenbuehl_potentials_msrc/out/"
-    path = ("/home/user/amueller/datasets/kraehenbuehl_potentials_msrc/"
-            "textonboost_trainval/")
+def load_kraehenbuehl(filename, which="train"):
+    if which == "train":
+        path = "/home/user/amueller/datasets/kraehenbuehl_potentials_msrc/out/"
+    elif which == "val":
+        path = ("/home/user/amueller/datasets/kraehenbuehl_potentials_msrc/"
+                "textonboost_trainval/")
+    else:
+        raise ValueError("Unexpected which in load_kraehenbuehl: %s" % which)
     #path = "/home/local/datasets/MSRC_ObjCategImageDatabase_v2/asdf/"
     with open(path + filename + ".unary") as f:
         size = np.fromfile(f, dtype=np.uint32, count=3).byteswap()
@@ -254,12 +269,12 @@ def load_kraehenbuehl(filename):
     return img
 
 
-#@memory.cache
-def get_kraehenbuehl_pot_sp(data):
+@memory.cache
+def get_kraehenbuehl_pot_sp(data, which="train"):
     feats = []
     for x, filename, superpixels in zip(data.X, data.file_names,
                                         data.superpixels):
-        probs = load_kraehenbuehl(filename)
+        probs = load_kraehenbuehl(filename, which=which)
         #if np.min(probs) < 0:
         if True:
             # softmax normalization
@@ -279,6 +294,21 @@ def get_kraehenbuehl_pot_sp(data):
         # renormalize (same as dividing by sp sizes)
         feats.append(sp_probs / sp_probs.sum(axis=-1)[:, np.newaxis])
     return feats
+
+
+def sigm(x):
+    return 1. / (1 + np.exp(-x))
+
+
+def add_kraehenbuehl_features(data, which="train"):
+    sp_probas = get_kraehenbuehl_pot_sp(data, which=which)
+    if isinstance(data.X[0], np.ndarray):
+        X = [np.hstack([sigm(x), probas])
+             for x, probas in zip(data.X, sp_probas)]
+    else:
+        X = [(np.hstack([sigm(x[0]), probas]), x[1])
+             for x, probas in zip(data.X, sp_probas)]
+    return DataBunch(X, data.Y, data.file_names, data.superpixels)
 
 
 def eval_on_pixels(data, sp_predictions, print_results=True):

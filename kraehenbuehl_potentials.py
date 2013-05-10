@@ -3,11 +3,7 @@ import matplotlib.pyplot as plt
 
 from datasets.msrc import MSRCDataset
 from msrc_helpers import (load_kraehenbuehl, load_data, eval_on_pixels,
-                          get_kraehenbuehl_pot_sp, DataBunch)
-
-
-def sigm(x):
-    return 1. / (1 + np.exp(-x))
+                          get_kraehenbuehl_pot_sp, add_kraehenbuehl_features)
 
 
 def pixelwise():
@@ -31,13 +27,6 @@ def on_slic_superpixels():
                                     probs])
     plt.matshow(results['confusion'])
     plt.show()
-
-
-def add_kraehenbuehl_features(data):
-    sp_probas = get_kraehenbuehl_pot_sp(data)
-    X = [(np.hstack([sigm(x[0]), probas]), x[1])
-         for x, probas in zip(data.X, sp_probas)]
-    return DataBunch(X, data.Y, data.file_names, data.superpixels)
 
 
 def with_aureliens_potentials_svm(test=False):
