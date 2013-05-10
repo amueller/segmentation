@@ -1,7 +1,9 @@
 import numpy as np
 
-from msrc_helpers import (discard_void, eval_on_pixels,
-                          transform_chi2, concatenate_datasets)
+#from sklearn.svm import SVC
+from sklearn.svm import LinearSVC
+
+from msrc_helpers import (discard_void, eval_on_pixels, concatenate_datasets)
 from msrc_helpers import SimpleSplitCV, load_data
 #from kraehenbuehl_potentials import add_kraehenbuehl_features
 
@@ -9,47 +11,62 @@ from IPython.core.debugger import Tracer
 tracer = Tracer()
 
 
+class PixelwiseScorer(object):
+    def __init__(self, data):
+        self.data = data
+        self.greater_is_better = True
+
+    def __call__(self, estimator, X, y):
+        result = eval_on_pixels(self.data,
+                                [estimator.predict(x) for x in self.data.X])
+        return result['average']
+
+
 def train_svm(test=False, C=0.01, gamma=.1, grid=False):
-    data_train = load_data()
+    which = "piecewise"
 
-    cv = 3
-    if test:
-        data_val = load_data('val')
-        n_samples_train = len(np.hstack(data_train.Y))
-        n_samples_val = len(np.hstack(data_val.Y))
-        cv = SimpleSplitCV(n_samples_train, n_samples_val)
-        data_train = concatenate_datasets(data_train, data_val)
-
-    data_train = transform_chi2(data_train)
+    data_train = load_data(which=which)
     data_train_novoid = discard_void(data_train, 21)
 
-    from sklearn.svm import SVC
-    svm = SVC(kernel='rbf', class_weight='auto', C=C, gamma=gamma,
-              shrinking=False, cache_size=5000)
+    if grid and test:
+        raise ValueError("Don't you dare grid-search on the test-set!")
+
+    svm = LinearSVC(C=C)
+    #svm = SVC(kernel='rbf', class_weight='auto', C=C, gamma=gamma,
+              #shrinking=False, cache_size=5000)
 
     if grid:
+        data_val = load_data('val', which=which)
+        data_val_novoid = discard_void(data_train, 21)
+        n_samples_train = len(np.hstack(data_train_novoid.Y))
+        n_samples_val = len(np.hstack(data_val_novoid.Y))
+        cv = SimpleSplitCV(n_samples_train, n_samples_val)
+        data_trainval = concatenate_datasets(data_train_novoid,
+                                             data_val_novoid)
+        scorer = PixelwiseScorer(data=data_val)
+
         from sklearn.grid_search import GridSearchCV
-        grid = GridSearchCV(svm, param_grid={'C': 10. ** np.arange(1, 4),
-                                             'gamma': 10. ** np.arange(-3, 1)},
-                            verbose=10, n_jobs=1, cv=cv)
-        grid.fit(np.vstack(data_train_novoid.X),
-                 np.hstack(data_train_novoid.Y))
+        #param_grid = {'C': 10. ** np.arange(1, 4), 'gamma': 10. **
+                      #np.arange(-3, 1)}
+        param_grid = {'C': 10. ** np.arange(1, 4)}
+        grid = GridSearchCV(svm, param_grid=param_grid, verbose=10, n_jobs=1,
+                            cv=cv, scoring=scorer)
+        grid.fit(np.vstack(data_trainval.X),
+                 np.hstack(data_trainval.Y))
+        print(grid.best_params_)
+        print(grid.best_score_)
     else:
         print(svm)
         svm.fit(np.vstack(data_train_novoid.X), np.hstack(data_train_novoid.Y))
+        scorer(svm, data_train.X, data_train.Y)
+        if test:
+            data_test = load_data("test", which=which)
+        else:
+            data_test = load_data("val", which=which)
+        scorer(svm, data_test.X, data_test.Y)
 
-        eval_on_pixels(data_train, [svm.predict(x) for x in data_train.X])
-
-    if test:
-        data_test = load_data("test")
-    else:
-        data_test = load_data("val")
-
-    data_test = transform_chi2(data_test)
-    eval_on_pixels(data_test, [svm.predict(x) for x in
-                               data_test.X])
     return svm
 
 
 if __name__ == "__main__":
-    train_svm()
+    train_svm(grid=True)

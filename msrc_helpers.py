@@ -44,7 +44,7 @@ def load_data(dataset="train", which="bow"):
                     "data_%s_1000_color.pickle" % dataset)
     elif which == "piecewise":
         filename = ("/home/user/amueller/checkout/superpixel_crf/"
-                    "data_probs_%_cw.pickle" % dataset)
+                    "data_probs_%s_cw.pickle" % dataset)
     else:
         raise ValueError("'which' should be 'bow' or 'piecewise'")
 
