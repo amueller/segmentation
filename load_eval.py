@@ -8,10 +8,10 @@ import numpy as np
 #from sklearn.metrics import confusion_matrix
 
 from pystruct.utils import SaveLogger
-from pystruct.problems import LatentNodeCRF, EdgeFeatureGraphCRF
+from pystruct.models import LatentNodeCRF, EdgeFeatureGraphCRF
 
-from msrc_first_try import eval_on_pixels
-from msrc_helpers import plot_results, add_edge_features, add_edges
+from msrc_helpers import (plot_results, add_edge_features, add_edges,
+                          eval_on_pixels, load_data)
 from hierarchical_crf import make_hierarchical_data
 from hierarchical_segmentation import plot_results_hierarchy
 
@@ -22,6 +22,8 @@ def main():
     argv = sys.argv
     print("loading %s ..." % argv[1])
     ssvm = SaveLogger(file_name=argv[1]).load()
+    if hasattr(ssvm, 'problem'):
+        ssvm.model = ssvm.problem
     print(ssvm)
     if hasattr(ssvm, 'base_ssvm'):
         ssvm = ssvm.base_ssvm
@@ -49,33 +51,27 @@ def main():
             print(title)
             #independent = True
             independent = False
-            #with open("/home/user/amueller/checkout/superpixel_crf/"
-                      #"data_%s_1000_color.pickle" % data_str) as f:
-            with open("/home/user/amueller/checkout/superpixel_crf/"
-                      "data_probs_%s_cw_trainval.pickle"
-                      % data_str) as f:
-                data = cPickle.load(f)
-            if isinstance(ssvm.problem, EdgeFeatureGraphCRF):
+            data = load_data(data_str, which="piecewise")
+            if isinstance(ssvm.model, EdgeFeatureGraphCRF):
                 independent = False
 
-            if ssvm.problem.inference_method == 'dai':
+            if ssvm.model.inference_method == 'dai':
                 independent = True
                 print("DAI DAI DAI")
-            #data = load_stacked_results(data_str)
             data = add_edges(data, independent=independent)
-            #data = transform_chi2(data)
-            #data = load_data(data_str, independent=False)
             data = add_kraehenbuehl_features(data)
-            if isinstance(ssvm.problem, EdgeFeatureGraphCRF):
+            # may Guido have mercy on my soul
+            #(I renamed the module after pickling)
+            if type(ssvm.model).__name__ == 'EdgeFeatureGraphCRF':
                 data = add_edge_features(data)
 
-            if isinstance(ssvm.problem, LatentNodeCRF):
+            if isinstance(ssvm.model, LatentNodeCRF):
                 data = make_hierarchical_data(data, lateral=True, latent=True)
 
             Y_pred = ssvm.predict(data.X)
 
-            if isinstance(ssvm.problem, LatentNodeCRF):
-                Y_pred = [ssvm.problem.label_from_latent(h) for h in Y_pred]
+            if isinstance(ssvm.model, LatentNodeCRF):
+                Y_pred = [ssvm.model.label_from_latent(h) for h in Y_pred]
             #print("Predicted classes")
             #print(["%s: %.2f" % (c, x)
                    #for c, x in zip(classes, np.bincount(np.hstack(Y_pred)))])
@@ -85,17 +81,24 @@ def main():
             eval_on_pixels(data, Y_pred)
 
     elif argv[2] == 'curves':
-        fig, axes = plt.subplots(1, 3)
-        axes[0].plot(ssvm.objective_curve_)
+        fig, axes = plt.subplots(1, 2)
+        axes[0].set_title("Objective")
+        axes[0].plot(ssvm.objective_curve_, label="dual")
+        axes[0].set_yscale('log')
+        inds = np.arange(len(ssvm.objective_curve_))
         # if we pressed ctrl+c in a bad moment
         try:
             inference_run = inference_run[:len(ssvm.objective_curve_)]
-            axes[1].plot(np.array(ssvm.objective_curve_)[inference_run])
-            axes[0].plot(ssvm.primal_objective_curve_)
-            axes[1].plot(np.array(ssvm.primal_objective_curve_)[inference_run])
+            axes[0].plot(ssvm.primal_objective_curve_, label="cached primal")
+            axes[0].plot(inds[inference_run],
+                         np.array(ssvm.primal_objective_curve_)[inference_run],
+                         'o', label="primal")
+            axes[0].legend()
         except:
             pass
-        axes[2].plot(ssvm.loss_curve_)
+        axes[1].plot(ssvm.loss_curve_)
+        axes[1].set_title("Trainings Loss")
+        axes[1].set_yscale('log')
         plt.show()
 
     elif argv[2] == 'plot':
@@ -108,9 +111,9 @@ def main():
         data = add_edges(data, independent=False)
         data = add_kraehenbuehl_features(data)
         #data = add_edge_features(data)
-        if isinstance(ssvm.problem, LatentNodeCRF):
+        if isinstance(ssvm.model, LatentNodeCRF):
             data = make_hierarchical_data(data, lateral=True, latent=True)
-        if isinstance(ssvm.problem, LatentNodeCRF):
+        if isinstance(ssvm.model, LatentNodeCRF):
             try:
                 Y_pred = ssvm.predict_latent(data.X)
             except AttributeError:
