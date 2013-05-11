@@ -1,7 +1,6 @@
 import numpy as np
 
-from sklearn.svm import SVC
-#from sklearn.svm import LinearSVC
+from sklearn.svm import LinearSVC
 #from sklearn.linear_model import LogisticRegression
 
 from msrc_helpers import (discard_void, PixelwiseScorer, concatenate_datasets)
@@ -22,11 +21,9 @@ def train_svm(test=False, C=0.01, gamma=.1, grid=False):
     if grid and test:
         raise ValueError("Don't you dare grid-search on the test-set!")
 
-    #svm = LinearSVC(C=C, class_weight='auto', multi_class='crammer_singer',
-                    #dual=False, loss='l1')
+    svm = LinearSVC(C=C, class_weight='auto', multi_class='crammer_singer',
+                    dual=False, loss='l1')
     #svm = LogisticRegression(C=C, class_weight='auto')
-    svm = SVC(kernel='rbf', class_weight='auto', C=C, gamma=gamma,
-              shrinking=False, cache_size=500)
 
     if grid:
         #data_val = add_kraehenbuehl_features(data_val, which="trainval")
@@ -39,22 +36,14 @@ def train_svm(test=False, C=0.01, gamma=.1, grid=False):
         data_trainval = concatenate_datasets(data_train_novoid,
                                              data_val_novoid)
 
-        #from sklearn.grid_search import GridSearchCV
-        from sklearn.grid_search import RandomizedSearchCV
-        from scipy.stats import expon, gamma
+        from sklearn.grid_search import GridSearchCV
         #param_grid = {'C': 10. ** np.arange(1, 4), 'gamma': 10. **
                       #np.arange(-3, 1)}
-        #param_grid = {'C': 10. ** np.arange(-2, 2)}
+        param_grid = {'C': 10. ** np.arange(-2, 2)}
         scorer = PixelwiseScorer(data=data_val)
-        #grid = GridSearchCV(svm, param_grid=param_grid, verbose=10, n_jobs=1,
-                            #cv=cv, scoring=scorer, pre_dispatch=1,
-                            #refit=False)
-        param_distributions = {'gamma': expon(), 'C': gamma(10, loc=0,
-                                                            scale=1)}
-        grid = RandomizedSearchCV(svm, verbose=10, cv=cv, refit=False,
-                                  scoring=scorer,
-                                  param_distributions=param_distributions,
-                                  n_jobs=1, n_iter=100)
+        grid = GridSearchCV(svm, param_grid=param_grid, verbose=10, n_jobs=1,
+                            cv=cv, scoring=scorer, pre_dispatch=1,
+                            refit=False)
         grid.fit(np.vstack(data_trainval.X),
                  np.hstack(data_trainval.Y))
         print(grid.best_params_)
