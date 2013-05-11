@@ -1,5 +1,3 @@
-import cPickle
-
 import numpy as np
 
 from pystruct import learners
@@ -8,10 +6,10 @@ from pystruct import learners
 import pystruct.problems as crfs
 from pystruct.utils import SaveLogger
 
-from msrc_helpers import discard_void, add_edge_features, add_edges
+from msrc_helpers import discard_void, add_edge_features, add_edges, load_data
 #from msrc_helpers import SimpleSplitCV, concatenate_datasets
 
-from kraehenbuehl_potentials import add_kraehenbuehl_features
+#from kraehenbuehl_potentials import add_kraehenbuehl_features
 
 
 from IPython.core.debugger import Tracer
@@ -23,25 +21,17 @@ def main():
     #independent = True
     independent = False
     test = False
-    with open("/home/user/amueller/checkout/superpixel_crf/"
-              "data_probs_train_cw_trainval.pickle") as f:
-    #with open("/home/user/amueller/checkout/superpixel_crf/"
-              #"data_train_1000_color.pickle") as f:
-        data_train = cPickle.load(f)
-    #data_train = load_stacked_results()
+    data_train = load_data(which="piecewise")
 
-    #with open("../superpixel_crf/data_val_1000_color.pickle") as f:
-        #data_val = cPickle.load(f)
-    #data_train = load_data("train", independent=independent)
     data_train = add_edges(data_train, independent=independent)
-    data_train = add_kraehenbuehl_features(data_train)
+    #data_train = add_kraehenbuehl_features(data_train)
     data_train = discard_void(data_train, 21)
 
     if not independent:
         data_train = add_edge_features(data_train)
 
     if test:
-        pass
+        raise ValueError("grrr")
         #with open("../superpixel_crf/data_probs_val_cw_trainval.pickle") as f:
         #with open("../superpixel_crf/data_val_1000_color.pickle") as f:
             #data_val = cPickle.load(f)
@@ -72,16 +62,16 @@ def main():
                                        n_edge_features=3,
                                        symmetric_edge_features=[0, 1],
                                        antisymmetric_edge_features=[2])
-    experiment_name = "redo_edge_features_0.05"
-    warm_start = True
-    #warm_start = False
+    experiment_name = "all_new_edge_features_C.1"
+    #warm_start = True
+    warm_start = False
     #ssvm = learners.SubgradientSSVM(
         #problem, verbose=2, C=0.1, n_jobs=-1, max_iter=100000,
         #learning_rate=0.001, show_loss_every=10, decay_exponent=0.5,
         #momentum=0.0,
         #logger=SaveLogger(experiment_name + ".pickle", save_every=10))
     ssvm = learners.OneSlackSSVM(
-        problem, verbose=3, C=.01, max_iter=100000, n_jobs=-1,
+        problem, verbose=3, C=.1, max_iter=100000, n_jobs=-1,
         tol=0.001, show_loss_every=50, inference_cache=10, cache_tol='auto',
         logger=SaveLogger(experiment_name + ".pickle", save_every=100),
         inactive_threshold=1e-5, break_on_bad=False, inactive_window=50)
