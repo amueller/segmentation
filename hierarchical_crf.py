@@ -7,15 +7,14 @@ from scipy import sparse
 from sklearn.utils import shuffle
 #from sklearn.grid_search import GridSearchCV
 
-from pystruct.problems import GraphCRF, LatentNodeCRF
+from pystruct.models import GraphCRF, LatentNodeCRF
 from pystruct import learners
 from pystruct.utils import SaveLogger
-from pystruct.problems.latent_node_crf import kmeans_init
+from pystruct.models.latent_node_crf import kmeans_init
 
 from hierarchical_segmentation import (get_segment_features,
                                        plot_results_hierarchy)
-from msrc_first_try import load_data
-from msrc_helpers import discard_void, add_edges
+from msrc_helpers import discard_void, add_edges, load_data
 
 from kraehenbuehl_potentials import add_kraehenbuehl_features
 
@@ -106,8 +105,10 @@ def svm_on_segments():
     n_states = 21
     class_weights = 1. / np.bincount(np.hstack(Y_))
     class_weights *= 21. / np.sum(class_weights)
-    experiment_name = "latent_piecewise_texton_subgradient_100_lr.0001_trainval_bla"
-    #experiment_name = "latent_piecewise_texton_subgradient_.1_lr.0001_trainval_BAM"
+    experiment_name = "latent_piecewise_texton_subgradient"\
+        "_100_lr.0001_trainval_bla"
+    #experiment_name =
+    #"latent_piecewise_texton_subgradient_.1_lr.0001_trainval_BAM"
     logger = SaveLogger(experiment_name + ".pickle", save_every=10)
     #latent_logger = SaveLogger("lssvm_" + experiment_name + "_%d.pickle",
                                #save_every=1)
@@ -127,7 +128,8 @@ def svm_on_segments():
                                               #decay_exponent=0, momentum=0.99,
                                               #max_iter=100000)
         ssvm = logger.load()
-        ssvm.logger = SaveLogger(experiment_name + "_retrain2.pickle", save_every=10)
+        ssvm.logger = SaveLogger(experiment_name + "_retrain2.pickle",
+                                 save_every=10)
         ssvm.learning_rate = 0.001
     else:
         problem = GraphCRF(n_states=n_states, n_features=21,
