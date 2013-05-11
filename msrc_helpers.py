@@ -264,6 +264,9 @@ def load_kraehenbuehl(filename, which="train"):
     elif which == "trainval":
         path = ("/home/user/amueller/datasets/kraehenbuehl_potentials_msrc/"
                 "textonboost_trainval/")
+    elif which == "train_30px":
+        path = ("/home/user/amueller/datasets/kraehenbuehl_potentials_msrc/"
+                "train_30px/")
     else:
         raise ValueError("Unexpected which in load_kraehenbuehl: %s" % which)
     #path = "/home/local/datasets/MSRC_ObjCategImageDatabase_v2/asdf/"
@@ -280,8 +283,7 @@ def get_kraehenbuehl_pot_sp(data, which="train"):
     for x, filename, superpixels in zip(data.X, data.file_names,
                                         data.superpixels):
         probs = load_kraehenbuehl(filename, which=which)
-        #if np.min(probs) < 0:
-        if True:
+        if which != "train":
             # softmax normalization
             probs -= np.max(probs, axis=-1)[:, :, np.newaxis]
             probs = np.exp(probs)
@@ -305,13 +307,17 @@ def sigm(x):
     return 1. / (1 + np.exp(-x))
 
 
-def add_kraehenbuehl_features(data, which="train"):
+def add_kraehenbuehl_features(data, which="train", replace=False):
     sp_probas = get_kraehenbuehl_pot_sp(data, which=which)
+    if replace:
+        X = [probas
+             for probas in sp_probas]
+        return DataBunch(X, data.Y, data.file_names, data.superpixels)
     if isinstance(data.X[0], np.ndarray):
-        X = [np.hstack([sigm(x), probas])
+        X = [np.hstack([x, probas])
              for x, probas in zip(data.X, sp_probas)]
     else:
-        X = [(np.hstack([sigm(x[0]), probas]), x[1])
+        X = [(np.hstack([x[0], probas]), x[1])
              for x, probas in zip(data.X, sp_probas)]
     return DataBunch(X, data.Y, data.file_names, data.superpixels)
 
