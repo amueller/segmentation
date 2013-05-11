@@ -53,6 +53,9 @@ def load_data(dataset="train", which="bow"):
     if which == "bow":
         filename = ("/home/user/amueller/checkout/superpixel_crf/"
                     "data_%s_1000_color.pickle" % dataset)
+    elif which == "bow_old":
+        filename = ("/home/user/amueller/checkout/superpixel_crf/"
+                    "data_%s_1000_color_old.pickle" % dataset)
     elif which == "piecewise":
         filename = ("/home/user/amueller/checkout/superpixel_crf/"
                     "data_probs_%s_cw.pickle" % dataset)
@@ -61,6 +64,8 @@ def load_data(dataset="train", which="bow"):
 
     with open(filename) as f:
             data = cPickle.load(f)
+    if which in ["bow", "bow_old"]:
+        data = transform_chi2(data)
     return data
 
 
@@ -256,7 +261,7 @@ def discard_void(data, void_label=21):
 def load_kraehenbuehl(filename, which="train"):
     if which == "train":
         path = "/home/user/amueller/datasets/kraehenbuehl_potentials_msrc/out/"
-    elif which == "val":
+    elif which == "trainval":
         path = ("/home/user/amueller/datasets/kraehenbuehl_potentials_msrc/"
                 "textonboost_trainval/")
     else:
