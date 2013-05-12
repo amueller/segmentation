@@ -23,10 +23,11 @@ def main(C=1):
     data_train = add_edges(data_train, independent=independent)
     data_train = add_kraehenbuehl_features(data_train, which="train_30px")
     data_train = add_kraehenbuehl_features(data_train, which="train")
-    data_train = discard_void(data_train, 21)
 
     if not independent:
         data_train = add_edge_features(data_train)
+
+    data_train = discard_void(data_train, 21)
 
     if test:
         raise ValueError("grrr")
