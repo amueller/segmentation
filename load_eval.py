@@ -87,7 +87,8 @@ def main():
         fig, axes = plt.subplots(1, 2)
         if hasattr(ssvm, 'timestamps_'):
             print("loading timestamps")
-            inds = np.array(ssvm.timestamps_)[1:-1] / 60.
+            inds = np.array(ssvm.timestamps_)
+            inds = inds[1:len(ssvm.objective_curve_) + 1] / 60.
             axes[0].set_xlabel('training time (min)')
             axes[1].set_xlabel('training time (min)')
         else:
