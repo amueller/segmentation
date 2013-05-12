@@ -1,6 +1,7 @@
 from collections import namedtuple
 import os
 from glob import glob
+import numbers
 
 import cPickle
 
@@ -229,8 +230,12 @@ def discard_void(data, void_label=21):
         if len(x) == 2:
             features, edges = x
         elif len(x) == 3:
-            features, edges, n_hidden = x
-            mask = np.hstack([mask, np.ones(n_hidden, dtype=np.bool)])
+            if isinstance(x[2], numbers.Integral):
+                features, edges, n_hidden = x
+                mask = np.hstack([mask, np.ones(n_hidden, dtype=np.bool)])
+            else:
+                features, edges, edge_features = x
+                edge_features_new = edge_features
         else:
             raise ValueError("len(x) is weird: %d" % len(data.X[0]))
 
@@ -241,6 +246,8 @@ def discard_void(data, void_label=21):
             for void_node in voids:
                 involves_void_node = np.any(edges_new == void_node, axis=1)
                 edges_new = edges_new[~involves_void_node]
+                if len(x) == 3 and not isinstance(x[2], numbers.Integral):
+                    edge_features_new = edge_features_new[~involves_void_node]
 
         reindex_edges = np.zeros(len(mask), dtype=np.int)
         reindex_edges[mask] = np.arange(np.sum(mask))
@@ -249,11 +256,16 @@ def discard_void(data, void_label=21):
             X_new.append((features[mask], edges_new))
             Y_new.append(y[mask])
         else:
-            n_hidden_new = np.max(edges_new) - np.sum(mask[:-n_hidden]) + 1
-            X_new.append((features[mask[:-n_hidden]], edges_new, n_hidden_new))
-            Y_new.append(y[mask[:-n_hidden]])
-            #X_new.append((features[mask], edges_new, n_hidden_new))
-            #Y_new.append(y[mask[:-n_hidden]])
+            if isinstance(x[2], numbers.Integral):
+                n_hidden_new = np.max(edges_new) - np.sum(mask[:-n_hidden]) + 1
+                X_new.append((features[mask[:-n_hidden]], edges_new,
+                              n_hidden_new))
+                Y_new.append(y[mask[:-n_hidden]])
+                #X_new.append((features[mask], edges_new, n_hidden_new))
+                #Y_new.append(y[mask[:-n_hidden]])
+            else:
+                X_new.append((features[mask], edges_new, edge_features_new))
+                Y_new.append(y[mask])
 
     return DataBunch(X_new, Y_new, data.file_names, data.superpixels)
 
