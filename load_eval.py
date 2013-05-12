@@ -76,9 +76,12 @@ def main():
             #print(["%s: %.2f" % (c, x)
                    #for c, x in zip(classes, np.bincount(np.hstack(Y_pred)))])
             Y_flat = np.hstack(data.Y)
-            print("superpixel accuracy: %s"
-                  % np.mean((np.hstack(Y_pred) == Y_flat)[Y_flat != 21]))
-            eval_on_pixels(data, Y_pred)
+            print("superpixel accuracy: %.2f"
+                  % (np.mean((np.hstack(Y_pred) == Y_flat)[Y_flat != 21]) *
+                     100))
+            res = eval_on_pixels(data, Y_pred, print_results=False)
+            print("global: %.2f, average: %.2f" % (res['global'] * 100,
+                                                   res['average'] * 100))
 
     elif argv[2] == 'curves':
         fig, axes = plt.subplots(1, 2)
