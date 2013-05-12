@@ -85,21 +85,27 @@ def main():
 
     elif argv[2] == 'curves':
         fig, axes = plt.subplots(1, 2)
+        if hasattr(ssvm, 'timestamps_'):
+            print("loading timestamps")
+            inds = np.array(ssvm.timestamps_)[1:-1] / 60.
+            axes[0].set_xlabel('training time (min)')
+            axes[1].set_xlabel('training time (min)')
+        else:
+            inds = np.arange(len(ssvm.objective_curve_))
+            axes[0].set_xlabel('QP iterations')
+            axes[1].set_xlabel('QP iterations')
+
         axes[0].set_title("Objective")
-        axes[0].plot(ssvm.objective_curve_, label="dual")
+        axes[0].plot(inds, ssvm.objective_curve_, label="dual")
         axes[0].set_yscale('log')
-        inds = np.arange(len(ssvm.objective_curve_))
-        # if we pressed ctrl+c in a bad moment
-        try:
-            inference_run = inference_run[:len(ssvm.objective_curve_)]
-            axes[0].plot(ssvm.primal_objective_curve_, label="cached primal")
-            axes[0].plot(inds[inference_run],
-                         np.array(ssvm.primal_objective_curve_)[inference_run],
-                         'o', label="primal")
-            axes[0].legend()
-        except:
-            pass
-        axes[1].plot(ssvm.loss_curve_)
+        inference_run = inference_run[:len(ssvm.objective_curve_)]
+        axes[0].plot(inds, ssvm.primal_objective_curve_,
+                     label="cached primal")
+        axes[0].plot(inds[inference_run],
+                     np.array(ssvm.primal_objective_curve_)[inference_run],
+                     'o', label="primal")
+        axes[0].legend()
+        axes[1].plot(inds[::ssvm.show_loss_every], ssvm.loss_curve_)
         axes[1].set_title("Trainings Loss")
         axes[1].set_yscale('log')
         plt.show()
