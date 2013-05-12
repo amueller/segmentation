@@ -38,7 +38,10 @@ def get_centers(sps):
 
 
 def get_km_segments(x, image, sps, n_segments=25):
-    feats, edges = x
+    if len(x) == 2:
+        feats, edges = x
+    else:
+        feats, edges, _ = x
     colors_ = get_colors(image, sps)
     centers = get_centers(sps)
     #graph = sparse.coo_matrix((np.ones(edges.shape[0]), edges.T))
@@ -51,7 +54,10 @@ def get_km_segments(x, image, sps, n_segments=25):
 @memory.cache
 def get_segment_features(x, y, image, sps):
     segments = get_km_segments(x, image, sps)
-    feats, edges = x
+    if len(x) == 2:
+        feats, edges = x
+    else:
+        feats, edges, _ = x
     segment_edges = segments[edges]
     # make direction of edges unique
     segment_edges = np.sort(segment_edges, axis=1)
