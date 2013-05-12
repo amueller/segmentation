@@ -57,15 +57,24 @@ def load_data(dataset="train", which="bow"):
     elif which == "bow_old":
         filename = ("/home/user/amueller/checkout/superpixel_crf/"
                     "data_%s_1000_color_old.pickle" % dataset)
+    elif which == "bow_new":
+        filename = ("/home/user/amueller/checkout/superpixel_crf/"
+                    "data_%s_1000_color_new.pickle" % dataset)
+    elif which == "bow_5k":
+        filename = ("/home/user/amueller/checkout/superpixel_crf/"
+                    "data_%s_5000_color.pickle" % dataset)
     elif which == "piecewise":
         filename = ("/home/user/amueller/checkout/superpixel_crf/"
                     "data_probs_%s_cw.pickle" % dataset)
+    elif which == "piecewise_new":
+        filename = ("/home/user/amueller/checkout/superpixel_crf/"
+                    "data_probs_%s_new.pickle" % dataset)
     else:
         raise ValueError("'which' should be 'bow' or 'piecewise'")
 
     with open(filename) as f:
             data = cPickle.load(f)
-    if which in ["bow", "bow_old"]:
+    if which in ["bow", "bow_old", "bow_new", "bow_5k"]:
         data = transform_chi2(data)
     return data
 
