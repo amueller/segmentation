@@ -17,7 +17,7 @@ from IPython.core.debugger import Tracer
 tracer = Tracer()
 
 
-def svm_on_segments(C=.1, subgradient=True):
+def svm_on_segments(C=.1, learning_rate=.001, subgradient=True):
     # load and prepare data
     lateral = True
     latent = True
@@ -51,7 +51,8 @@ def svm_on_segments(C=.1, subgradient=True):
     n_states = 21
     class_weights = 1. / np.bincount(np.hstack(Y_))
     class_weights *= 21. / np.sum(class_weights)
-    experiment_name = "latent25_subgradient_hierarchical_C%f_lr001" % C
+    experiment_name = ("latent25_subgradient_hierarchical_C%f_lr%f"
+                       % (C, learning_rate))
     logger = SaveLogger(experiment_name + ".pickle", save_every=10)
     if latent:
         model = LatentNodeCRF(n_labels=n_states,
@@ -61,13 +62,13 @@ def svm_on_segments(C=.1, subgradient=True):
         if subgradient:
             ssvm = learners.LatentSubgradientSSVM(
                 model, C=C, verbose=1, show_loss_every=10, logger=logger,
-                n_jobs=-1, learning_rate=0.001, decay_exponent=0,
-                momentum=0.99, max_iter=100000)
+                n_jobs=-1, learning_rate=learning_rate, decay_exponent=0,
+                momentum=0.9, max_iter=200)
         else:
             latent_logger = SaveLogger("lssvm_" + experiment_name +
                                        "_%d.pickle", save_every=10)
             base_ssvm = learners.OneSlackSSVM(
-                model, verbose=2, C=C, max_iter=100000, n_jobs=-1,
+                model, verbose=2, C=C, max_iter=100000, n_jobs=1,
                 tol=0, show_loss_every=200, inference_cache=50, logger=logger,
                 cache_tol='auto', inactive_threshold=1e-5, break_on_bad=False)
             ssvm = learners.LatentSSVM(base_ssvm, logger=latent_logger)
@@ -120,7 +121,8 @@ def plot_results():
 
 if __name__ == "__main__":
     #for C in 10. ** np.arange(-5, 2):
-        #svm_on_segments(C=C)
-    svm_on_segments(C=1)
+    for lr in 10. ** np.arange(-5, -2):
+        svm_on_segments(C=.01, learning_rate=lr)
+    #svm_on_segments(C=.1)
     #plot_init()
     #plot_results()
