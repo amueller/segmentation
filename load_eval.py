@@ -59,7 +59,8 @@ def main():
                 independent = True
                 print("DAI DAI DAI")
             data = add_edges(data, independent=independent)
-            data = add_kraehenbuehl_features(data)
+            data = add_kraehenbuehl_features(data, which="train_30px")
+            #data = add_kraehenbuehl_features(data, which="train")
             # may Guido have mercy on my soul
             #(I renamed the module after pickling)
             if type(ssvm.model).__name__ == 'EdgeFeatureGraphCRF':
@@ -107,7 +108,7 @@ def main():
                      'o', label="primal")
         axes[0].legend()
         axes[1].plot(inds[::ssvm.show_loss_every], ssvm.loss_curve_)
-        axes[1].set_title("Trainings Loss")
+        axes[1].set_title("Training Error")
         axes[1].set_yscale('log')
         plt.show()
 
