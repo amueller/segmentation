@@ -48,9 +48,9 @@ def main(C=1):
     class_weights *= 21. / np.sum(class_weights)
     #class_weights = np.ones(n_states)
     print(class_weights)
-    #problem = crfs.GraphCRF(n_states=n_states, n_features=X_[0][0].shape[1],
-                            #inference_method='qpbo',
-                            #class_weight=class_weights, rescale_C=True)
+    #model = crfs.GraphCRF(n_states=n_states,
+                          #n_features=data_train.X[0][0].shape[1],
+                          #inference_method='qpbo', class_weight=class_weights)
     model = crfs.EdgeFeatureGraphCRF(n_states=n_states,
                                      n_features=data_train.X[0][0].shape[1],
                                      inference_method='qpbo',

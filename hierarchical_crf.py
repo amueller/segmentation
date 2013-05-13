@@ -51,7 +51,7 @@ def svm_on_segments(C=.1, subgradient=True):
     n_states = 21
     class_weights = 1. / np.bincount(np.hstack(Y_))
     class_weights *= 21. / np.sum(class_weights)
-    experiment_name = "latent25_subgradient_hierarchical_C%f" % C
+    experiment_name = "latent25_subgradient_hierarchical_C%f_lr001" % C
     logger = SaveLogger(experiment_name + ".pickle", save_every=10)
     if latent:
         model = LatentNodeCRF(n_labels=n_states,
@@ -61,7 +61,7 @@ def svm_on_segments(C=.1, subgradient=True):
         if subgradient:
             ssvm = learners.LatentSubgradientSSVM(
                 model, C=C, verbose=1, show_loss_every=10, logger=logger,
-                n_jobs=1, learning_rate=0.000001, decay_exponent=0,
+                n_jobs=-1, learning_rate=0.001, decay_exponent=0,
                 momentum=0.99, max_iter=100000)
         else:
             latent_logger = SaveLogger("lssvm_" + experiment_name +
@@ -88,7 +88,7 @@ def svm_on_segments(C=.1, subgradient=True):
                                     symmetric_edge_features=[0, 1],
                                     antisymmetric_edge_features=[2])
         ssvm = learners.OneSlackSSVM(
-            model, verbose=1, C=C, max_iter=100000, n_jobs=-1,
+            model, verbose=2, C=C, max_iter=100000, n_jobs=-1,
             tol=0.0001, show_loss_every=200, inference_cache=50, logger=logger,
             cache_tol='auto', inactive_threshold=1e-5, break_on_bad=False)
 

@@ -49,7 +49,8 @@ def make_hierarchical_data(data, lateral=False, latent=False):
         X_stacked = [(np.vstack([x[0], feat]),
                       np.vstack([x[1], edges] if lateral else edges),
                       np.vstack([np.hstack([x[2], np.zeros((len(x[1]), 1))]),
-                                 np.hstack([np.zeros((len(edges), 3)),
+                                 np.hstack([np.zeros((len(edges),
+                                                      x[2].shape[1])),
                                             np.ones((len(edges), 1))])]))
                      for x, feat, edges in zip(data.X, all_features,
                                                all_edges)]
