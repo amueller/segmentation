@@ -27,15 +27,14 @@ def main():
     print(ssvm)
     if hasattr(ssvm, 'base_ssvm'):
         ssvm = ssvm.base_ssvm
-    try:
-        print("Iterations: %d" % len(ssvm.objective_curve_))
-        print("Objective: %f" % ssvm.objective_curve_[-1])
+    print("Iterations: %d" % len(ssvm.objective_curve_))
+    print("Objective: %f" % ssvm.objective_curve_[-1])
+    inference_run = None
+    if hasattr(ssvm, 'cached_constraint_'):
         inference_run = ~np.array(ssvm.cached_constraint_)
         print("Gap: %f" %
               (np.array(ssvm.primal_objective_curve_)[inference_run][-1] -
                ssvm.objective_curve_[-1]))
-    except:
-        pass
 
     if len(argv) <= 2:
         return
@@ -60,7 +59,7 @@ def main():
                 print("DAI DAI DAI")
             data = add_edges(data, independent=independent)
             data = add_kraehenbuehl_features(data, which="train_30px")
-            #data = add_kraehenbuehl_features(data, which="train")
+            data = add_kraehenbuehl_features(data, which="train")
             # may Guido have mercy on my soul
             #(I renamed the module after pickling)
             if type(ssvm.model).__name__ == 'EdgeFeatureGraphCRF':
@@ -100,14 +99,20 @@ def main():
         axes[0].set_title("Objective")
         axes[0].plot(inds, ssvm.objective_curve_, label="dual")
         axes[0].set_yscale('log')
-        inference_run = inference_run[:len(ssvm.objective_curve_)]
-        axes[0].plot(inds, ssvm.primal_objective_curve_,
-                     label="cached primal")
-        axes[0].plot(inds[inference_run],
-                     np.array(ssvm.primal_objective_curve_)[inference_run],
-                     'o', label="primal")
+        if hasattr(ssvm, "primal_objective_curve_"):
+            axes[0].plot(inds, ssvm.primal_objective_curve_,
+                         label="cached primal" if inference_run is not None
+                         else "primal")
+        if inference_run is not None:
+            inference_run = inference_run[:len(ssvm.objective_curve_)]
+            axes[0].plot(inds[inference_run],
+                         np.array(ssvm.primal_objective_curve_)[inference_run],
+                         'o', label="primal")
         axes[0].legend()
-        axes[1].plot(inds[::ssvm.show_loss_every], ssvm.loss_curve_)
+        try:
+            axes[1].plot(inds[::ssvm.show_loss_every], ssvm.loss_curve_)
+        except:
+            axes[1].plot(ssvm.loss_curve_)
         axes[1].set_title("Training Error")
         axes[1].set_yscale('log')
         plt.show()
