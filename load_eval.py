@@ -1,6 +1,5 @@
 #!/usr/bin/python
 import sys
-import cPickle
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -121,9 +120,7 @@ def main():
         data_str = 'test'
         if len(argv) <= 3:
             raise ValueError("Need a folder name for plotting.")
-        with open("../superpixel_crf/data_probs_%s_cw_trainval.pickle"
-                  % data_str) as f:
-            data = cPickle.load(f)
+        data = load_data(data_str, which="piecewise")
         data = add_edges(data, independent=False)
         data = add_kraehenbuehl_features(data)
         #data = add_edge_features(data)
