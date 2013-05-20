@@ -20,7 +20,8 @@ def make_hierarchy_edges(segments, superpixels):
     return all_edges
 
 
-def make_hierarchical_data(data, lateral=False, latent=False):
+def make_hierarchical_data(data, lateral=False, latent=False,
+                           latent_lateral=False):
     from datasets.msrc import MSRCDataset
     msrc = MSRCDataset()
     images = [msrc.get_image(f) for f in data.file_names]
@@ -32,29 +33,42 @@ def make_hierarchical_data(data, lateral=False, latent=False):
 
     all_edges = make_hierarchy_edges(all_segments, data.superpixels)
 
-    if latent:
-        #X_stacked = [(np.vstack([x[0], feat]),
-        X_stacked = [(x[0],
-                      np.vstack([x[1], edges] if lateral else edges),
-                      len(feat))
-                     for x, feat, edges in zip(data.X, all_features,
-                                               all_edges)]
-        Y_stacked = data.Y
-    else:
-        #X_stacked = [(np.vstack([x[0], feat]),
-                      #np.vstack([x[1], edges] if lateral else edges))
-                     #for x, feat, edges in zip(data.X, all_features,
-                                               #all_edges)]
-        # edge features:
-        X_stacked = [(np.vstack([x[0], feat]),
-                      np.vstack([x[1], edges] if lateral else edges),
-                      np.vstack([np.hstack([x[2], np.zeros((len(x[1]), 1))]),
-                                 np.hstack([np.zeros((len(edges),
-                                                      x[2].shape[1])),
-                                            np.ones((len(edges), 1))])]))
-                     for x, feat, edges in zip(data.X, all_features,
-                                               all_edges)]
-        Y_stacked = [np.hstack([y, y_]) for y, y_ in zip(data.Y, all_labels)]
+    X_stacked, Y_stacked = [], []
+    for x, y, feat, edges, labels in zip(data.X, data.Y, all_features,
+                                         all_edges, all_labels):
+        edges_stacked = np.vstack([x[1], edges] if lateral else edges)
+
+        if latent:
+            y_stacked = y
+            n_nodes = len(x[0])
+            if latent_lateral:
+                hierarchy = sparse.csr_matrix(
+                    (np.ones(len(edges)), edges.T), shape=(n_nodes + len(feat),
+                                                           n_nodes))
+                visible_lateral = sparse.csr_matrix(
+                    (np.ones(len(x[1])), x[1].T), shape=(n_nodes, n_nodes))
+                graph_latent_lateral = (hierarchy * visible_lateral *
+                                        hierarchy.T)
+                # make symmetric
+                graph_latent_lateral = (graph_latent_lateral +
+                                        graph_latent_lateral.T)
+                edges_latent_lateral = np.c_[graph_latent_lateral.nonzero()]
+                # remove self-edges and make sorted
+                edges_latent_lateral = \
+                    edges_latent_lateral[edges_latent_lateral[:, 0] <
+                                         edges_latent_lateral[:, 1]]
+                edges_stacked = np.vstack([edges_stacked,
+                                           edges_latent_lateral])
+            x_stacked = (x[0], edges_stacked, len(feat))
+        else:
+            if latent_lateral:
+                raise ValueError("wut?")
+            feat = np.vstack(x[0], feat)
+            y_stacked = np.hstack([y, labels])
+            x_stacked = (feat, edges_stacked)
+
+        X_stacked.append(x_stacked)
+        Y_stacked.append(y_stacked)
 
     return HierarchicalDataBunch(X_stacked, Y_stacked, data.file_names,
                                  data.superpixels, all_segments)
