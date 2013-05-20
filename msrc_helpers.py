@@ -116,32 +116,18 @@ def load_data_aurelien(dataset="train", independent=False):
 
 def region_graph(regions):
     edges = make_grid_edges(regions)
-    n_vertices = regions.size
+    n_vertices = np.max(regions) + 1
 
     crossings = edges[regions.ravel()[edges[:, 0]]
                       != regions.ravel()[edges[:, 1]]]
-    crossing_hash = (regions.ravel()[crossings[:, 0]]
-                     + n_vertices * regions.ravel()[crossings[:, 1]])
+    edges = regions.ravel()[crossings]
+    edges = np.sort(edges, axis=1)
+    crossing_hash = (edges[:, 0] + n_vertices * edges[:, 1])
     # find unique connections
     unique_hash = np.unique(crossing_hash)
     # undo hashing
-    unique_crossings = np.asarray([[x % n_vertices, x / n_vertices]
-                                   for x in unique_hash])
-    if False:
-        # plotting code
-        # compute region centers:
-        gridx, gridy = np.mgrid[:regions.shape[0], :regions.shape[1]]
-        centers = np.zeros((n_vertices, 2))
-        for v in xrange(n_vertices):
-            centers[v] = [gridy[regions == v].mean(),
-                          gridx[regions == v].mean()]
-        # plot labels
-        plt.imshow(regions)
-        # overlay graph:
-        for crossing in unique_crossings:
-            plt.plot([centers[crossing[0]][0], centers[crossing[1]][0]],
-                     [centers[crossing[0]][1], centers[crossing[1]][1]])
-        plt.show()
+    unique_crossings = np.c_[unique_hash % n_vertices,
+                             unique_hash // n_vertices]
     return unique_crossings
 
 
@@ -198,12 +184,13 @@ def concatenate_datasets(data1, data2):
     return DataBunch(X, Y, file_names, superpixels)
 
 
+@memory.cache
 def add_edges(data, independent=False):
     # generate graph
     if independent:
         X_new = [(x, np.empty((0, 2), dtype=np.int)) for x in data.X]
     else:
-        X_new = [(x, np.sort(region_graph(sp), axis=-1))
+        X_new = [(x, region_graph(sp))
                  for x, sp in zip(data.X, data.superpixels)]
 
     return DataBunch(X_new, data.Y, data.file_names, data.superpixels)
