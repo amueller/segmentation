@@ -117,16 +117,16 @@ def main():
         plt.show()
 
     elif argv[2] == 'plot':
-        data_str = 'test'
+        data_str = 'val'
         if len(argv) <= 3:
             raise ValueError("Need a folder name for plotting.")
         data = load_data(data_str, which="piecewise")
         data = add_edges(data, independent=False)
-        data = add_kraehenbuehl_features(data)
+        data = add_kraehenbuehl_features(data, which="train_30px")
+        data = add_kraehenbuehl_features(data, which="train")
         #data = add_edge_features(data)
         if isinstance(ssvm.model, LatentNodeCRF):
             data = make_hierarchical_data(data, lateral=True, latent=True)
-        if isinstance(ssvm.model, LatentNodeCRF):
             try:
                 Y_pred = ssvm.predict_latent(data.X)
             except AttributeError:
