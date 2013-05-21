@@ -12,13 +12,12 @@ tracer = Tracer()
 
 
 def train_svm(test=False, C=0.01, gamma=.1, grid=False):
-    which = "piecewise_trainval"
+    which = "piecewise"
 
     data_train = load_data(which=which)
     data_train = add_kraehenbuehl_features(data_train, which="train_30px")
     data_train = add_kraehenbuehl_features(data_train, which="train")
     data_train_novoid = discard_void(data_train, 21)
-
     if grid and test:
         raise ValueError("Don't you dare grid-search on the test-set!")
 
@@ -71,4 +70,4 @@ def train_svm(test=False, C=0.01, gamma=.1, grid=False):
 
 
 if __name__ == "__main__":
-    train_svm(grid=False, C=.1, test=True)
+    train_svm(grid=False, C=.1, test=False)
