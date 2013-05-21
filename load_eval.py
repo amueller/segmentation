@@ -65,7 +65,8 @@ def main():
                 data = add_edge_features(data)
 
             if isinstance(ssvm.model, LatentNodeCRF):
-                data = make_hierarchical_data(data, lateral=True, latent=True)
+                data = make_hierarchical_data(data, lateral=True, latent=True,
+                                              latent_lateral=True)
 
             Y_pred = ssvm.predict(data.X)
 
@@ -87,7 +88,8 @@ def main():
         if hasattr(ssvm, 'timestamps_'):
             print("loading timestamps")
             inds = np.array(ssvm.timestamps_)
-            inds = inds[1:len(ssvm.objective_curve_) + 1] / 60.
+            inds = inds[2:len(ssvm.objective_curve_) + 1] / 60.
+            inds = np.hstack([inds, [inds[-1]]])
             axes[0].set_xlabel('training time (min)')
             axes[1].set_xlabel('training time (min)')
         else:
