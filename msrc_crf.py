@@ -5,7 +5,8 @@ import pystruct.models as crfs
 from pystruct.utils import SaveLogger
 
 from msrc_helpers import (discard_void, add_edge_features, add_edges,
-                          load_data, add_kraehenbuehl_features)
+                          load_data, add_kraehenbuehl_features,
+                          concatenate_datasets)
 #from msrc_helpers import SimpleSplitCV, concatenate_datasets
 
 
@@ -13,11 +14,10 @@ from IPython.core.debugger import Tracer
 tracer = Tracer()
 
 
-def main(C=1):
+def main(C=1, test=False):
     # load training data
     #independent = True
     independent = False
-    test = False
     data_train = load_data(which="piecewise")
 
     data_train = add_edges(data_train, independent=independent)
@@ -30,13 +30,13 @@ def main(C=1):
     data_train = discard_void(data_train, 21)
 
     if test:
-        raise ValueError("grrr")
-        ##data_val = load_data("val")
-        #data_val = add_edges(data_val, independent=independent)
-        ##data_val = add_kraehenbuehl_features(data_val)
-        #data_val = discard_void(data_val, 21)
-        #if not independent:
-            #data_val = add_edge_features(data_val)
+        data_val = load_data("val", which="piecewise_train")
+        data_val = add_edges(data_val, independent=independent)
+        data_val = add_kraehenbuehl_features(data_val, which="train_30px")
+        data_val = add_kraehenbuehl_features(data_val, which="train")
+        data_val = add_edge_features(data_val)
+        data_val = discard_void(data_val, 21)
+        data_train = concatenate_datasets(data_train, data_val)
 
         #X_.extend(data_val.X)
         #Y_.extend(data_val.Y)
@@ -58,34 +58,39 @@ def main(C=1):
                                      n_edge_features=3,
                                      symmetric_edge_features=[0, 1],
                                      antisymmetric_edge_features=[2])
-    experiment_name = "all_new_edge_features_C%f" % C
-    #warm_start = True
-    warm_start = False
+    experiment_name = "edge_features_subgradient_C%f_nomom_lr0.00001" % C
+    warm_start = True
+    #warm_start = False
     #ssvm = learners.SubgradientSSVM(
         #problem, verbose=2, C=0.1, n_jobs=-1, max_iter=100000,
         #learning_rate=0.001, show_loss_every=10, decay_exponent=0.5,
         #momentum=0.0,
         #logger=SaveLogger(experiment_name + ".pickle", save_every=10))
-    ssvm = learners.OneSlackSSVM(
-        model, verbose=3, C=C, max_iter=100000, n_jobs=-1,
-        tol=0.001, show_loss_every=50, inference_cache=50, cache_tol='auto',
-        logger=SaveLogger(experiment_name + ".pickle", save_every=100),
-        inactive_threshold=1e-5, break_on_bad=False, inactive_window=50)
+    #ssvm = learners.OneSlackSSVM(
+        #model, verbose=3, C=C, max_iter=100000, n_jobs=-1,
+        #tol=0.001, show_loss_every=50, inference_cache=50, cache_tol='auto',
+        #logger=SaveLogger(experiment_name + ".pickle", save_every=100),
+        #inactive_threshold=1e-5, break_on_bad=False, inactive_window=50)
+    ssvm = learners.SubgradientSSVM(
+        model, verbose=3, C=C, max_iter=10000, n_jobs=-1, show_loss_every=10,
+        logger=SaveLogger(experiment_name + ".pickle", save_every=10),
+        momentum=0, learning_rate=0.001, decay_exponent=1)
 
     if warm_start:
         ssvm = SaveLogger(experiment_name + ".pickle").load()
         ssvm.logger = SaveLogger(
             file_name=experiment_name + "_refit.pickle",
-            save_every=100)
-        ssvm.model.inference_method = 'ad3'
-        ssvm.n_jobs = 1
+            save_every=10)
+        ssvm.learning_rate = 0.000001
+        #ssvm.model.inference_method = 'ad3'
+        #ssvm.n_jobs = 1
 
     ssvm.fit(data_train.X, data_train.Y, warm_start=warm_start)
     print("fit finished!")
     return
-    tracer()
 
 
 if __name__ == "__main__":
-    for C in 10. ** np.arange(-3, 3):
-        main(C)
+    #for C in 10. ** np.arange(-4, 2):
+        #main(C)
+    main(.01, test=False)
