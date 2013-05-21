@@ -65,7 +65,10 @@ def load_data(dataset="train", which="bow"):
                     "data_%s_5000_color.pickle" % dataset)
     elif which == "piecewise":
         filename = ("/home/user/amueller/checkout/superpixel_crf/"
-                    "data_probs_%s_cw.pickle" % dataset)
+                    "data_probs_%s_cw_2.pickle" % dataset)
+    elif which == "piecewise_trainval":
+        filename = ("/home/user/amueller/checkout/superpixel_crf/"
+                    "data_probs_%s_cw_trainval.pickle" % dataset)
     elif which == "piecewise_new":
         filename = ("/home/user/amueller/checkout/superpixel_crf/"
                     "data_probs_%s_new.pickle" % dataset)
@@ -76,6 +79,9 @@ def load_data(dataset="train", which="bow"):
             data = cPickle.load(f)
     if which in ["bow", "bow_old", "bow_new", "bow_5k"]:
         data = transform_chi2(data)
+    if which == "piecewise_new":
+        X = [sigm(x) for x in data.X]
+        data = DataBunch(X, data.Y, data.file_names, data.superpixels)
     return data
 
 
@@ -200,7 +206,7 @@ def add_edges(data, independent=False):
 def transform_chi2(data):
     chi2 = AdditiveChi2Sampler(sample_steps=2)
     if isinstance(data.X[0], np.ndarray):
-        X_new = [chi2.fit_transform(x) for x in data.X]
+        X_new = [chi2.fit_transform(x).astype(np.float32) for x in data.X]
     elif len(data.X[0]) == 2:
         X_new = [(chi2.fit_transform(x[0]), x[1]) for x in data.X]
     elif len(data.X[0]) == 3:
@@ -275,6 +281,9 @@ def load_kraehenbuehl(filename, which="train"):
     elif which == "train_30px":
         path = ("/home/user/amueller/datasets/kraehenbuehl_potentials_msrc/"
                 "train_30px/")
+    elif which == "trainval_30px":
+        path = ("/home/user/amueller/datasets/kraehenbuehl_potentials_msrc/"
+                "trainval_30px/")
     else:
         raise ValueError("Unexpected which in load_kraehenbuehl: %s" % which)
     #path = "/home/local/datasets/MSRC_ObjCategImageDatabase_v2/asdf/"
