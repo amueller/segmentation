@@ -10,11 +10,11 @@ from pystruct.utils import SaveLogger
 from pystruct.models import LatentNodeCRF, EdgeFeatureGraphCRF
 
 from msrc_helpers import (plot_results, add_edge_features, add_edges,
-                          eval_on_pixels, load_data)
+                          eval_on_pixels, load_data, load_data_global_probs)
 from hierarchical_crf import make_hierarchical_data, add_top_node
 from hierarchical_segmentation import plot_results_hierarchy
 
-from kraehenbuehl_potentials import add_kraehenbuehl_features
+from msrc_helpers import add_kraehenbuehl_features
 
 
 def main():
