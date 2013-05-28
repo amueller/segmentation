@@ -2,6 +2,7 @@ import numpy as np
 from collections import namedtuple
 from scipy import sparse
 
+from msrc_helpers import DataBunch
 from hierarchical_segmentation import get_segment_features
 
 HierarchicalDataBunch = namedtuple('HierarchicalDataBunch', 'X, Y, file_names,'
@@ -18,6 +19,21 @@ def make_hierarchy_edges(segments, superpixels):
         edges = np.vstack(edge_matrix.tocsr().nonzero()).T
         all_edges.append(edges)
     return all_edges
+
+
+def add_top_node(data):
+    X_stacked, Y_stacked = [], []
+    for x, y in zip(data.X, data.Y):
+        new_node = np.max(x[1]) + 1
+        n_nodes = len(x[0])
+        edges = np.c_[np.arange(n_nodes), np.repeat(new_node, n_nodes)]
+        edges_stacked = np.vstack([x[1], edges])
+
+        y_stacked = y
+        x_stacked = (x[0], edges_stacked, 1)
+        X_stacked.append(x_stacked)
+        Y_stacked.append(y_stacked)
+    return DataBunch(X_stacked, Y_stacked, data.file_names, data.superpixels)
 
 
 def make_hierarchical_data(data, lateral=False, latent=False,

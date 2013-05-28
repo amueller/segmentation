@@ -9,7 +9,7 @@ from pystruct.utils import SaveLogger
 from pystruct.models.latent_node_crf import kmeans_init
 
 from hierarchical_segmentation import plot_results_hierarchy
-from hierarchical_helpers import make_hierarchical_data
+from hierarchical_helpers import make_hierarchical_data, add_top_node
 from msrc_helpers import (discard_void, add_edges, load_data,
                           add_kraehenbuehl_features)  # , add_edge_features)
 
@@ -29,8 +29,9 @@ def svm_on_segments(C=.1, learning_rate=.001, subgradient=True):
     #if lateral:
         #data_train = add_edge_features(data_train)
     X_org_ = data_train.X
-    data_train = make_hierarchical_data(data_train, lateral=lateral,
-                                        latent=latent)
+    #data_train = make_hierarchical_data(data_train, lateral=lateral,
+                                        #latent=latent, latent_lateral=True)
+    data_train = add_top_node(data_train)
     data_train = discard_void(data_train, 21)
     X_, Y_ = data_train.X, data_train.Y
     # remove edges
@@ -51,8 +52,7 @@ def svm_on_segments(C=.1, learning_rate=.001, subgradient=True):
     n_states = 21
     class_weights = 1. / np.bincount(np.hstack(Y_))
     class_weights *= 21. / np.sum(class_weights)
-    experiment_name = ("latent5_soft_restart_ad3_meh2_C%f"
-                       % C)
+    experiment_name = ("latent5_C%f_top_node" % C)
     logger = SaveLogger(experiment_name + ".pickle", save_every=10)
     if latent:
         model = LatentNodeCRF(n_labels=n_states,
@@ -68,15 +68,19 @@ def svm_on_segments(C=.1, learning_rate=.001, subgradient=True):
             latent_logger = SaveLogger("lssvm_" + experiment_name +
                                        "_%d.pickle", save_every=1)
             base_ssvm = learners.OneSlackSSVM(
-                model, verbose=2, C=C, max_iter=100000, n_jobs=-1, tol=0.01,
+                model, verbose=2, C=C, max_iter=100000, n_jobs=-1, tol=0.001,
                 show_loss_every=200, inference_cache=50, logger=logger,
-                cache_tol='auto', inactive_threshold=1e-5,
-                break_on_bad=False, switch_to_ad3=True)
+                cache_tol='auto', inactive_threshold=1e-5, break_on_bad=False,
+                switch_to_ad3=True)
             ssvm = learners.LatentSSVM(base_ssvm, logger=latent_logger)
-        #ssvm = logger.load()
-        #ssvm.logger = SaveLogger(experiment_name + "_retrain2.pickle",
-                                 #save_every=10)
-        #ssvm.learning_rate = 0.001
+        warm_start = False
+        if warm_start:
+            ssvm = logger.load()
+            ssvm.logger = SaveLogger(experiment_name + "_retrain.pickle",
+                                     save_every=10)
+            ssvm.max_iter = 100000
+            ssvm.learning_rate = 0.00001
+            ssvm.momentum = 0
     else:
         #model = GraphCRF(n_states=n_states,
                          #n_features=data_train.X[0][0].shape[1],
@@ -98,6 +102,7 @@ def svm_on_segments(C=.1, learning_rate=.001, subgradient=True):
 
     X_, Y_ = shuffle(X_, Y_)
     #ssvm.fit(data_train.X, data_train.Y)
+    #ssvm.fit(X_, Y_, warm_start=warm_start)
     ssvm.fit(X_, Y_)
     print("fit finished!")
 
@@ -121,8 +126,10 @@ def plot_results():
 
 
 if __name__ == "__main__":
-    #for learning_rate in 10. ** np.arange(-3, 3):
-        #svm_on_segments(C=0.001, learning_rate=learning_rate)
-    svm_on_segments(C=.01, subgradient=False)
+    #for C in 10. ** np.arange(-5, 2):
+    #for lr in 10. ** np.arange(-3, 2)[::-1]:
+        #svm_on_segments(C=.01, learning_rate=lr)
+    #svm_on_segments(C=.01, learning_rate=0.1)
+    svm_on_segments(C=.1, subgradient=False)
     #plot_init()
     #plot_results()
