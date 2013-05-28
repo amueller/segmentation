@@ -85,20 +85,6 @@ def load_data(dataset="train", which="bow"):
     return data
 
 
-def load_data_global_probs(dataset="train", append=True):
-    data = load_data(dataset=dataset, which="piecewise")
-    descs = np.load("/home/user/amueller/checkout/superpixel_crf/"
-                    "global_probs_%s.npy" % dataset)
-    if append:
-        X = []
-        for x, glob_desc in zip(data.X, descs):
-            x_ = np.hstack([x, np.repeat(sigm(glob_desc)[np.newaxis, :],
-                                         x.shape[0], axis=0)])
-            X.append(x_)
-
-    return DataBunch(X, data.Y, data.file_names, data.superpixels)
-
-
 def load_data_aurelien(dataset="train", independent=False):
     mountain_idx = np.where(classes == "mountain")[0]
     horse_idx = np.where(classes == "horse")[0]

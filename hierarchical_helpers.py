@@ -2,7 +2,7 @@ import numpy as np
 from collections import namedtuple
 from scipy import sparse
 
-from msrc_helpers import DataBunch
+from msrc_helpers import DataBunch, load_data, sigm, add_edges
 from hierarchical_segmentation import get_segment_features
 
 HierarchicalDataBunch = namedtuple('HierarchicalDataBunch', 'X, Y, file_names,'
@@ -34,6 +34,30 @@ def add_top_node(data):
         X_stacked.append(x_stacked)
         Y_stacked.append(y_stacked)
     return DataBunch(X_stacked, Y_stacked, data.file_names, data.superpixels)
+
+
+def load_data_global_probs(dataset="train", latent=False):
+    data = load_data(dataset=dataset, which="piecewise")
+    data = add_edges(data)
+    if latent:
+        data = add_top_node(data)
+    descs = np.load("/home/user/amueller/checkout/superpixel_crf/"
+                    "global_probs_%s.npy" % dataset)
+    X = []
+    for x, glob_desc in zip(data.X, descs):
+        if latent:
+            x_ = np.vstack([x[0], np.repeat(sigm(glob_desc)[np.newaxis, :],
+                                            x[2], axis=0)])
+        else:
+            x_ = np.hstack([x[0], np.repeat(sigm(glob_desc)[np.newaxis, :],
+                                            x[0].shape[0], axis=0)])
+            # add features for latent node
+        if len(x) == 3:
+            X.append((x_, x[1], x[2]))
+        else:
+            X.append((x_, x[1]))
+
+    return DataBunch(X, data.Y, data.file_names, data.superpixels)
 
 
 def make_hierarchical_data(data, lateral=False, latent=False,

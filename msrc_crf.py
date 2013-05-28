@@ -7,6 +7,7 @@ from pystruct.utils import SaveLogger
 from msrc_helpers import (discard_void, add_edge_features, add_edges,
                           load_data, add_kraehenbuehl_features,
                           concatenate_datasets)
+from hierarchical_helpers import load_data_global_probs
 #from msrc_helpers import SimpleSplitCV, concatenate_datasets
 
 
@@ -18,9 +19,10 @@ def main(C=1, test=False):
     # load training data
     #independent = True
     independent = False
-    data_train = load_data(which="piecewise")
+    #data_train = load_data(which="piecewise")
+    #data_train = add_edges(data_train, independent=independent)
+    data_train = load_data_global_probs()
 
-    data_train = add_edges(data_train, independent=independent)
     data_train = add_kraehenbuehl_features(data_train, which="train_30px")
     data_train = add_kraehenbuehl_features(data_train, which="train")
 
@@ -58,23 +60,18 @@ def main(C=1, test=False):
                                      n_edge_features=3,
                                      symmetric_edge_features=[0, 1],
                                      antisymmetric_edge_features=[2])
-    experiment_name = "edge_features_subgradient_C%f_nomom_lr0.00001" % C
-    warm_start = True
-    #warm_start = False
+    experiment_name = "top_node_redo_%f" % C
+    #warm_start = True
+    warm_start = False
+    ssvm = learners.OneSlackSSVM(
+        model, verbose=3, C=C, max_iter=100000, n_jobs=-1,
+        tol=0.001, show_loss_every=50, inference_cache=50, cache_tol='auto',
+        logger=SaveLogger(experiment_name + ".pickle", save_every=100),
+        inactive_threshold=1e-5, break_on_bad=False, inactive_window=50)
     #ssvm = learners.SubgradientSSVM(
-        #problem, verbose=2, C=0.1, n_jobs=-1, max_iter=100000,
-        #learning_rate=0.001, show_loss_every=10, decay_exponent=0.5,
-        #momentum=0.0,
-        #logger=SaveLogger(experiment_name + ".pickle", save_every=10))
-    #ssvm = learners.OneSlackSSVM(
-        #model, verbose=3, C=C, max_iter=100000, n_jobs=-1,
-        #tol=0.001, show_loss_every=50, inference_cache=50, cache_tol='auto',
-        #logger=SaveLogger(experiment_name + ".pickle", save_every=100),
-        #inactive_threshold=1e-5, break_on_bad=False, inactive_window=50)
-    ssvm = learners.SubgradientSSVM(
-        model, verbose=3, C=C, max_iter=10000, n_jobs=-1, show_loss_every=10,
-        logger=SaveLogger(experiment_name + ".pickle", save_every=10),
-        momentum=0, learning_rate=0.001, decay_exponent=1)
+        #model, verbose=3, C=C, max_iter=10000, n_jobs=-1, show_loss_every=10,
+        #logger=SaveLogger(experiment_name + ".pickle", save_every=10),
+        #momentum=0, learning_rate=0.001, decay_exponent=1)
 
     if warm_start:
         ssvm = SaveLogger(experiment_name + ".pickle").load()
