@@ -11,7 +11,7 @@ from pystruct.models import LatentNodeCRF, EdgeFeatureGraphCRF
 
 from msrc_helpers import (plot_results, add_edge_features, add_edges,
                           eval_on_pixels, load_data)
-from hierarchical_crf import make_hierarchical_data, add_top_node
+from hierarchical_crf import make_hierarchical_data
 from hierarchical_segmentation import plot_results_hierarchy
 from hierarchical_helpers import load_data_global_probs
 from msrc_helpers import add_kraehenbuehl_features
@@ -65,8 +65,7 @@ def main():
             if type(ssvm.model).__name__ == 'EdgeFeatureGraphCRF':
                 data = add_edge_features(data)
 
-            if isinstance(ssvm.model, LatentNodeCRF):
-                data = add_top_node(data)
+            #if isinstance(ssvm.model, LatentNodeCRF):
                 #data = make_hierarchical_data(data, lateral=True, latent=True,
                                               #latent_lateral=True)
 

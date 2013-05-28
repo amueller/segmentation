@@ -9,7 +9,8 @@ from pystruct.utils import SaveLogger
 from pystruct.models.latent_node_crf import kmeans_init
 
 from hierarchical_segmentation import plot_results_hierarchy
-from hierarchical_helpers import make_hierarchical_data, add_top_node
+from hierarchical_helpers import make_hierarchical_data
+from hierarchical_helpers import load_data_global_probs
 from msrc_helpers import (discard_void, add_edges, load_data,
                           add_kraehenbuehl_features)  # , add_edge_features)
 
@@ -22,17 +23,17 @@ def svm_on_segments(C=.1, learning_rate=.001, subgradient=True):
     lateral = True
     latent = True
     test = False
-    data_train = load_data(which="piecewise")
-    data_train = add_edges(data_train, independent=False)
-    data_train = add_kraehenbuehl_features(data_train, which="train_30px")
-    data_train = add_kraehenbuehl_features(data_train, which="train")
+    #data_train = load_data(which="piecewise")
+    #data_train = add_edges(data_train, independent=False)
+    data_train = load_data_global_probs(latent=latent)
+    #data_train = add_kraehenbuehl_features(data_train, which="train_30px")
+    #data_train = add_kraehenbuehl_features(data_train, which="train")
     #if lateral:
         #data_train = add_edge_features(data_train)
     X_org_ = data_train.X
     #data_train = make_hierarchical_data(data_train, lateral=lateral,
                                         #latent=latent, latent_lateral=True)
-    data_train = add_top_node(data_train)
-    data_train = discard_void(data_train, 21)
+    data_train = discard_void(data_train, 21, latent_features=True)
     X_, Y_ = data_train.X, data_train.Y
     # remove edges
     if not lateral:
@@ -52,13 +53,14 @@ def svm_on_segments(C=.1, learning_rate=.001, subgradient=True):
     n_states = 21
     class_weights = 1. / np.bincount(np.hstack(Y_))
     class_weights *= 21. / np.sum(class_weights)
-    experiment_name = ("latent5_C%f_top_node" % C)
+    experiment_name = ("latent5_features_C%f_top_node_no_texton" % C)
     logger = SaveLogger(experiment_name + ".pickle", save_every=10)
     if latent:
         model = LatentNodeCRF(n_labels=n_states,
                               n_features=data_train.X[0][0].shape[1],
                               n_hidden_states=5, inference_method='qpbo' if
-                              lateral else 'dai', class_weight=class_weights)
+                              lateral else 'dai', class_weight=class_weights,
+                              latent_node_features=True)
         if subgradient:
             ssvm = learners.LatentSubgradientSSVM(
                 model, C=C, verbose=1, show_loss_every=10, logger=logger,

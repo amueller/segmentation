@@ -218,7 +218,7 @@ def transform_chi2(data):
 
 
 @memory.cache
-def discard_void(data, void_label=21):
+def discard_void(data, void_label=21, latent_features=False):
     if isinstance(data.X[0], np.ndarray):
         X_new = [x[y != void_label] for x, y in zip(data.X, data.Y)]
         Y_new = [y[y != void_label] for y in data.Y]
@@ -260,8 +260,11 @@ def discard_void(data, void_label=21):
         else:
             if isinstance(x[2], numbers.Integral):
                 n_hidden_new = np.max(edges_new) - np.sum(mask[:-n_hidden]) + 1
-                X_new.append((features[mask[:-n_hidden]], edges_new,
-                              n_hidden_new))
+                if latent_features:
+                    X_new.append((features[mask], edges_new, n_hidden_new))
+                else:
+                    X_new.append((features[mask[:-n_hidden]], edges_new,
+                                  n_hidden_new))
                 Y_new.append(y[mask[:-n_hidden]])
                 #X_new.append((features[mask], edges_new, n_hidden_new))
                 #Y_new.append(y[mask[:-n_hidden]])

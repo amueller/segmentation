@@ -46,7 +46,7 @@ def load_data_global_probs(dataset="train", latent=False):
     X = []
     for x, glob_desc in zip(data.X, descs):
         if latent:
-            x_ = np.vstack([x[0], np.repeat(sigm(glob_desc)[np.newaxis, :],
+            x_ = np.vstack([x[0], np.repeat(sigm(glob_desc)[np.newaxis, 1:],
                                             x[2], axis=0)])
         else:
             x_ = np.hstack([x[0], np.repeat(sigm(glob_desc)[np.newaxis, :],
