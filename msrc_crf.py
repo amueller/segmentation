@@ -26,8 +26,8 @@ def main(C=1, test=False):
 
     #data_train = load_data_global_probs()
 
-    #if not independent:
-        #data_train = add_edge_features(data_train)
+    if not independent:
+        data_train = add_edge_features(data_train)
 
     data_train = discard_void(data_train, 21)
 
@@ -50,17 +50,17 @@ def main(C=1, test=False):
     class_weights *= 21. / np.sum(class_weights)
     #class_weights = np.ones(n_states)
     print(class_weights)
-    model = crfs.GraphCRF(n_states=n_states,
-                          n_features=data_train.X[0][0].shape[1],
-                          inference_method='qpbo', class_weight=class_weights)
-    #model = crfs.EdgeFeatureGraphCRF(n_states=n_states,
-                                     #n_features=data_train.X[0][0].shape[1],
-                                     #inference_method='qpbo',
-                                     #class_weight=class_weights,
-                                     #n_edge_features=3,
-                                     #symmetric_edge_features=[0, 1],
-                                     #antisymmetric_edge_features=[2])
-    experiment_name = "simple_graph_redo_ad3_blub%f" % C
+    #model = crfs.GraphCRF(n_states=n_states,
+                          #n_features=data_train.X[0][0].shape[1],
+                          #inference_method='qpbo', class_weight=class_weights)
+    model = crfs.EdgeFeatureGraphCRF(n_states=n_states,
+                                     n_features=data_train.X[0][0].shape[1],
+                                     inference_method='qpbo',
+                                     class_weight=class_weights,
+                                     n_edge_features=3,
+                                     symmetric_edge_features=[0, 1],
+                                     antisymmetric_edge_features=[2])
+    experiment_name = "strong_edges_%f" % C
     #warm_start = True
     warm_start = False
     ssvm = learners.OneSlackSSVM(
@@ -68,7 +68,7 @@ def main(C=1, test=False):
         tol=0.0001, show_loss_every=50, inference_cache=50, cache_tol='auto',
         logger=SaveLogger(experiment_name + ".pickle", save_every=100),
         inactive_threshold=1e-5, break_on_bad=False, inactive_window=50,
-        switch_to_ad3=True)
+        switch_to_ad3=False)
     #ssvm = learners.SubgradientSSVM(
         #model, verbose=3, C=C, max_iter=10000, n_jobs=-1, show_loss_every=10,
         #logger=SaveLogger(experiment_name + ".pickle", save_every=10),

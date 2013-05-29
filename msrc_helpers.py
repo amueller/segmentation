@@ -374,7 +374,7 @@ def add_edge_features(data):
         image = msrc.get_image(file_name)
         features.append(get_edge_contrast(x[1], image, superpixels))
         features.append(get_edge_directions(x[1], superpixels))
-        X.append((x[0], x[1], np.hstack(features)))
+        X.append((x[0], x[1], 10 * np.hstack(features)))
     return DataBunch(X, data.Y, data.file_names, data.superpixels)
 
 

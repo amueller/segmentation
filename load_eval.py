@@ -127,7 +127,8 @@ def main():
         data = add_edges(data, independent=False)
         data = add_kraehenbuehl_features(data, which="train_30px")
         data = add_kraehenbuehl_features(data, which="train")
-        #data = add_edge_features(data)
+        if type(ssvm.model).__name__ == 'EdgeFeatureGraphCRF':
+            data = add_edge_features(data)
         if isinstance(ssvm.model, LatentNodeCRF):
             data = make_hierarchical_data(data, lateral=True, latent=True)
             try:
