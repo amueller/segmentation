@@ -2,7 +2,8 @@ import numpy as np
 from collections import namedtuple
 from scipy import sparse
 
-from msrc_helpers import DataBunch, load_data, sigm, add_edges
+from msrc_helpers import (DataBunch, load_data, sigm, add_edges,
+                          add_kraehenbuehl_features)
 from hierarchical_segmentation import get_segment_features
 
 HierarchicalDataBunch = namedtuple('HierarchicalDataBunch', 'X, Y, file_names,'
@@ -37,7 +38,15 @@ def add_top_node(data):
 
 
 def load_data_global_probs(dataset="train", latent=False):
+    def padded_vstack(blub):
+        a, b = blub
+        if a.shape[0] > b.shape[0]:
+            b = np.hstack([b, np.zeros((b.shape[0], a.shape[1] - b.shape[1]))])
+        return np.vstack([a, b])
+
     data = load_data(dataset=dataset, which="piecewise")
+    data = add_kraehenbuehl_features(data, which="train_30px")
+    data = add_kraehenbuehl_features(data, which="train")
     data = add_edges(data)
     if latent:
         data = add_top_node(data)
@@ -46,8 +55,9 @@ def load_data_global_probs(dataset="train", latent=False):
     X = []
     for x, glob_desc in zip(data.X, descs):
         if latent:
-            x_ = np.vstack([x[0], np.repeat(sigm(glob_desc)[np.newaxis, 1:],
-                                            x[2], axis=0)])
+            x_ = padded_vstack([x[0],
+                                np.repeat(sigm(glob_desc)[np.newaxis, 1:],
+                                          x[2], axis=0)])
         else:
             x_ = np.hstack([x[0], np.repeat(sigm(glob_desc)[np.newaxis, :],
                                             x[0].shape[0], axis=0)])

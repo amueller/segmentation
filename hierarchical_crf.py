@@ -25,11 +25,11 @@ def svm_on_segments(C=.1, learning_rate=.001, subgradient=True):
     test = False
     #data_train = load_data(which="piecewise")
     #data_train = add_edges(data_train, independent=False)
-    data_train = load_data_global_probs(latent=latent)
     #data_train = add_kraehenbuehl_features(data_train, which="train_30px")
     #data_train = add_kraehenbuehl_features(data_train, which="train")
     #if lateral:
         #data_train = add_edge_features(data_train)
+    data_train = load_data_global_probs(latent=latent)
     X_org_ = data_train.X
     #data_train = make_hierarchical_data(data_train, lateral=lateral,
                                         #latent=latent, latent_lateral=True)
@@ -53,7 +53,7 @@ def svm_on_segments(C=.1, learning_rate=.001, subgradient=True):
     n_states = 21
     class_weights = 1. / np.bincount(np.hstack(Y_))
     class_weights *= 21. / np.sum(class_weights)
-    experiment_name = ("latent5_features_C%f_top_node_no_texton" % C)
+    experiment_name = ("latent5_features_C%f_top_node" % C)
     logger = SaveLogger(experiment_name + ".pickle", save_every=10)
     if latent:
         model = LatentNodeCRF(n_labels=n_states,

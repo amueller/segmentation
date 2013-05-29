@@ -55,11 +55,11 @@ def main():
             if ssvm.model.inference_method == 'dai':
                 independent = True
                 print("DAI DAI DAI")
-            data = load_data_global_probs(data_str)
+            data = load_data_global_probs(data_str, latent=True)
             #data = load_data(data_str, which="piecewise")
             #data = add_edges(data, independent=independent)
-            data = add_kraehenbuehl_features(data, which="train_30px")
-            data = add_kraehenbuehl_features(data, which="train")
+            #data = add_kraehenbuehl_features(data, which="train_30px")
+            #data = add_kraehenbuehl_features(data, which="train")
             # may Guido have mercy on my soul
             #(I renamed the module after pickling)
             if type(ssvm.model).__name__ == 'EdgeFeatureGraphCRF':
