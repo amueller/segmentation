@@ -7,7 +7,7 @@ from pystruct.utils import SaveLogger
 from msrc_helpers import (discard_void, add_edge_features, add_edges,
                           load_data, add_kraehenbuehl_features,
                           concatenate_datasets)
-from hierarchical_helpers import load_data_global_probs
+#from hierarchical_helpers import load_data_global_probs
 #from msrc_helpers import SimpleSplitCV, concatenate_datasets
 
 
@@ -19,15 +19,15 @@ def main(C=1, test=False):
     # load training data
     #independent = True
     independent = False
-    #data_train = load_data(which="piecewise")
-    #data_train = add_edges(data_train, independent=independent)
-    data_train = load_data_global_probs()
-
+    data_train = load_data(which="piecewise")
+    data_train = add_edges(data_train, independent=independent)
     data_train = add_kraehenbuehl_features(data_train, which="train_30px")
     data_train = add_kraehenbuehl_features(data_train, which="train")
 
-    if not independent:
-        data_train = add_edge_features(data_train)
+    #data_train = load_data_global_probs()
+
+    #if not independent:
+        #data_train = add_edge_features(data_train)
 
     data_train = discard_void(data_train, 21)
 
@@ -50,24 +50,25 @@ def main(C=1, test=False):
     class_weights *= 21. / np.sum(class_weights)
     #class_weights = np.ones(n_states)
     print(class_weights)
-    #model = crfs.GraphCRF(n_states=n_states,
-                          #n_features=data_train.X[0][0].shape[1],
-                          #inference_method='qpbo', class_weight=class_weights)
-    model = crfs.EdgeFeatureGraphCRF(n_states=n_states,
-                                     n_features=data_train.X[0][0].shape[1],
-                                     inference_method='qpbo',
-                                     class_weight=class_weights,
-                                     n_edge_features=3,
-                                     symmetric_edge_features=[0, 1],
-                                     antisymmetric_edge_features=[2])
-    experiment_name = "top_node_redo_%f" % C
+    model = crfs.GraphCRF(n_states=n_states,
+                          n_features=data_train.X[0][0].shape[1],
+                          inference_method='qpbo', class_weight=class_weights)
+    #model = crfs.EdgeFeatureGraphCRF(n_states=n_states,
+                                     #n_features=data_train.X[0][0].shape[1],
+                                     #inference_method='qpbo',
+                                     #class_weight=class_weights,
+                                     #n_edge_features=3,
+                                     #symmetric_edge_features=[0, 1],
+                                     #antisymmetric_edge_features=[2])
+    experiment_name = "simple_graph_redo_ad3_blub%f" % C
     #warm_start = True
     warm_start = False
     ssvm = learners.OneSlackSSVM(
-        model, verbose=3, C=C, max_iter=100000, n_jobs=-1,
-        tol=0.001, show_loss_every=50, inference_cache=50, cache_tol='auto',
+        model, verbose=2, C=C, max_iter=100000, n_jobs=-1,
+        tol=0.0001, show_loss_every=50, inference_cache=50, cache_tol='auto',
         logger=SaveLogger(experiment_name + ".pickle", save_every=100),
-        inactive_threshold=1e-5, break_on_bad=False, inactive_window=50)
+        inactive_threshold=1e-5, break_on_bad=False, inactive_window=50,
+        switch_to_ad3=True)
     #ssvm = learners.SubgradientSSVM(
         #model, verbose=3, C=C, max_iter=10000, n_jobs=-1, show_loss_every=10,
         #logger=SaveLogger(experiment_name + ".pickle", save_every=10),

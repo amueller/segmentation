@@ -13,7 +13,7 @@ from msrc_helpers import (plot_results, add_edge_features, add_edges,
                           eval_on_pixels, load_data)
 from hierarchical_crf import make_hierarchical_data
 from hierarchical_segmentation import plot_results_hierarchy
-from hierarchical_helpers import load_data_global_probs
+#from hierarchical_helpers import load_data_global_probs
 from msrc_helpers import add_kraehenbuehl_features
 
 
@@ -55,11 +55,11 @@ def main():
             if ssvm.model.inference_method == 'dai':
                 independent = True
                 print("DAI DAI DAI")
-            data = load_data_global_probs(data_str, latent=True)
-            #data = load_data(data_str, which="piecewise")
-            #data = add_edges(data, independent=independent)
-            #data = add_kraehenbuehl_features(data, which="train_30px")
-            #data = add_kraehenbuehl_features(data, which="train")
+            #data = load_data_global_probs(data_str, latent=True)
+            data = load_data(data_str, which="piecewise")
+            data = add_edges(data, independent=independent)
+            data = add_kraehenbuehl_features(data, which="train_30px")
+            data = add_kraehenbuehl_features(data, which="train")
             # may Guido have mercy on my soul
             #(I renamed the module after pickling)
             if type(ssvm.model).__name__ == 'EdgeFeatureGraphCRF':
