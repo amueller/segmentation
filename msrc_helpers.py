@@ -2,6 +2,7 @@ from collections import namedtuple
 import os
 from glob import glob
 import numbers
+import itertools
 
 import cPickle
 
@@ -191,13 +192,19 @@ def concatenate_datasets(data1, data2):
 
 
 @memory.cache
-def add_edges(data, independent=False):
+def add_edges(data, independent=False, fully_connected=False):
     # generate graph
     if independent:
         X_new = [(x, np.empty((0, 2), dtype=np.int)) for x in data.X]
     else:
-        X_new = [(x, region_graph(sp))
-                 for x, sp in zip(data.X, data.superpixels)]
+        if fully_connected:
+            X_new = [(x, np.vstack([e for e in
+                                    itertools.combinations(np.arange(len(x)),
+                                                           2)]))
+                     for x in data.X]
+        else:
+            X_new = [(x, region_graph(sp))
+                     for x, sp in zip(data.X, data.superpixels)]
 
     return DataBunch(X_new, data.Y, data.file_names, data.superpixels)
 
@@ -374,7 +381,7 @@ def add_edge_features(data):
         image = msrc.get_image(file_name)
         features.append(get_edge_contrast(x[1], image, superpixels))
         features.append(get_edge_directions(x[1], superpixels))
-        X.append((x[0], x[1], 10 * np.hstack(features)))
+        X.append((x[0], x[1], np.hstack(features)))
     return DataBunch(X, data.Y, data.file_names, data.superpixels)
 
 
@@ -408,8 +415,10 @@ def get_edge_directions(edges, superpixels):
     return np.vstack(directions)
 
 
-def plot_confusion_matrix(matrix, title=None):
-    plt.matshow(matrix)
+def plot_confusion_matrix(confusion, title=None):
+    confusion_normalized = (confusion.astype(np.float) /
+                            confusion.sum(axis=1)[:, np.newaxis])
+    plt.matshow(confusion_normalized)
     plt.axis("off")
     plt.colorbar()
     for i, c in enumerate(classes[:-2]):

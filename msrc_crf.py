@@ -20,7 +20,8 @@ def main(C=1, test=False):
     #independent = True
     independent = False
     data_train = load_data(which="piecewise")
-    data_train = add_edges(data_train, independent=independent)
+    data_train = add_edges(data_train, independent=independent,
+                           fully_connected=True)
     data_train = add_kraehenbuehl_features(data_train, which="train_30px")
     data_train = add_kraehenbuehl_features(data_train, which="train")
 
@@ -60,7 +61,7 @@ def main(C=1, test=False):
                                      n_edge_features=3,
                                      symmetric_edge_features=[0, 1],
                                      antisymmetric_edge_features=[2])
-    experiment_name = "strong_edges_%f" % C
+    experiment_name = "fully_connected_%f" % C
     #warm_start = True
     warm_start = False
     ssvm = learners.OneSlackSSVM(
