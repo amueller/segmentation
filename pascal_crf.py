@@ -1,11 +1,12 @@
 import numpy as np
-import matplotlib.pyplot as plt
 
 from pystruct import learners
 import pystruct.models as crfs
 from pystruct.utils import SaveLogger
 
-from pascal_helpers import load_pascal, load_image
+from pascal_helpers import load_pascal  # , load_image, cmap, eval_on_pixels,
+                            #load_kraehenbuehl, eval_on_sp, gt_in_sp,
+                            #get_ground_truth, load_pascal_pixelwise)
 from msrc_helpers import (discard_void, add_edge_features, add_edges,
                           load_data,  # add_kraehenbuehl_features,
                           concatenate_datasets)
@@ -93,18 +94,7 @@ def main(C=1, test=False):
     print("fit finished!")
     return
 
-
-def visualize_pascal():
-    data_train = load_pascal()
-    for x, y, f in zip(data_train.X, data_train.Y, data_train.file_names)[:3]:
-        fig, ax = plt.subplots(3)
-        ax[0].imshow(load_image(f))
-        ax[1].imshow(y)
-        ax[2].imshow(np.argmax(x, axis=-1))
-    plt.show()
-
 if __name__ == "__main__":
     #for C in 10. ** np.arange(-4, 2):
         #main(C)
-    #main(.01, test=False)
-    visualize_pascal()
+    main(.01, test=False)
