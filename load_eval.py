@@ -9,12 +9,13 @@ import numpy as np
 from pystruct.utils import SaveLogger
 from pystruct.models import LatentNodeCRF, EdgeFeatureGraphCRF
 
-from msrc_helpers import (plot_results, add_edge_features, add_edges,
-                          eval_on_pixels, load_data)
-from hierarchical_crf import make_hierarchical_data
-from hierarchical_segmentation import plot_results_hierarchy
+from msrc.msrc_helpers import (plot_results, add_edge_features, add_edges,
+                               eval_on_pixels, load_data,
+                               plot_confusion_matrix)
+from msrc.hierarchical_crf import make_hierarchical_data
+from msrc.hierarchical_segmentation import plot_results_hierarchy
 #from hierarchical_helpers import load_data_global_probs
-from msrc_helpers import add_kraehenbuehl_features
+from msrc.msrc_helpers import add_kraehenbuehl_features
 
 
 def main():
@@ -47,8 +48,8 @@ def main():
         for data_str, title in zip(["train", "val"],
                                    ["TRAINING SET", "VALIDATION SET"]):
             print(title)
-            #independent = True
-            independent = False
+            independent = True
+            #independent = False
             if isinstance(ssvm.model, EdgeFeatureGraphCRF):
                 independent = False
 
@@ -58,8 +59,8 @@ def main():
             #data = load_data_global_probs(data_str, latent=True)
             data = load_data(data_str, which="piecewise")
             data = add_edges(data, independent=independent)
-            data = add_kraehenbuehl_features(data, which="train_30px")
-            data = add_kraehenbuehl_features(data, which="train")
+            #data = add_kraehenbuehl_features(data, which="train_30px")
+            #data = add_kraehenbuehl_features(data, which="train")
             # may Guido have mercy on my soul
             #(I renamed the module after pickling)
             if type(ssvm.model).__name__ == 'EdgeFeatureGraphCRF':
@@ -68,21 +69,20 @@ def main():
             #if isinstance(ssvm.model, LatentNodeCRF):
                 #data = make_hierarchical_data(data, lateral=True, latent=True,
                                               #latent_lateral=True)
-
+            ssvm.model.inference_method = "qpbo"
             Y_pred = ssvm.predict(data.X)
 
             if isinstance(ssvm.model, LatentNodeCRF):
                 Y_pred = [ssvm.model.label_from_latent(h) for h in Y_pred]
-            #print("Predicted classes")
-            #print(["%s: %.2f" % (c, x)
-                   #for c, x in zip(classes, np.bincount(np.hstack(Y_pred)))])
             Y_flat = np.hstack(data.Y)
             print("superpixel accuracy: %.2f"
                   % (np.mean((np.hstack(Y_pred) == Y_flat)[Y_flat != 21]) *
                      100))
-            res = eval_on_pixels(data, Y_pred, print_results=False)
+            res = eval_on_pixels(data, Y_pred, print_results=True)
             print("global: %.2f, average: %.2f" % (res['global'] * 100,
                                                    res['average'] * 100))
+            plot_confusion_matrix(res['confusion'])
+        plt.show()
 
     elif argv[2] == 'curves':
         fig, axes = plt.subplots(1, 2)
@@ -129,6 +129,7 @@ def main():
         data = add_kraehenbuehl_features(data, which="train")
         if type(ssvm.model).__name__ == 'EdgeFeatureGraphCRF':
             data = add_edge_features(data)
+        #ssvm.model.inference_method = 'qpbo'
         if isinstance(ssvm.model, LatentNodeCRF):
             data = make_hierarchical_data(data, lateral=True, latent=True)
             try:
