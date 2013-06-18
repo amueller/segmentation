@@ -4,7 +4,7 @@ from pystruct import learners
 import pystruct.models as crfs
 from pystruct.utils import SaveLogger
 
-from pascal_helpers import load_pascal, eval_on_sp
+from pascal_helpers import load_pascal, eval_on_sp, add_edge_features
 from latent_crf_experiments.utils import discard_void, add_edges
 
 #from hierarchical_helpers import load_data_global_probs
@@ -17,7 +17,7 @@ tracer = Tracer()
 
 def main(C=1, test=False):
     # load training data
-    independent = True
+    independent = False
     data_train = load_pascal("train1")
     data_train = add_edges(data_train, independent=independent)
     data_train = discard_void(data_train, 255)
@@ -26,8 +26,8 @@ def main(C=1, test=False):
 
     #data_train = load_data_global_probs()
 
-    #if not independent:
-        #data_train = add_edge_features(data_train)
+    if not independent:
+        data_train = add_edge_features(data_train)
 
     n_states = 21
     print("number of samples: %s" % len(data_train.X))
@@ -40,21 +40,21 @@ def main(C=1, test=False):
     #model = crfs.CrammerSingerSVMModel(n_features=X.shape[1],
                                        #n_classes=n_states,
                                        #class_weight=class_weights)
-    model = crfs.GraphCRF(n_states=n_states,
-                          n_features=data_train.X[0][0].shape[1],
-                          inference_method='qpbo', class_weight=class_weights)
-    #model = crfs.EdgeFeatureGraphCRF(n_states=n_states,
-                                     #n_features=data_train.X[0][0].shape[1],
-                                     #inference_method='qpbo',
-                                     #class_weight=class_weights,
-                                     #n_edge_features=3,
-                                     #symmetric_edge_features=[0, 1],
-                                     #antisymmetric_edge_features=[2])
-    experiment_name = "pascal_independent_graph_train1_%f" % C
+    #model = crfs.GraphCRF(n_states=n_states,
+                          #n_features=data_train.X[0][0].shape[1],
+                          #inference_method='qpbo', class_weight=class_weights)
+    model = crfs.EdgeFeatureGraphCRF(n_states=n_states,
+                                     n_features=data_train.X[0][0].shape[1],
+                                     inference_method='qpbo',
+                                     class_weight=class_weights,
+                                     n_edge_features=3,
+                                     symmetric_edge_features=[0, 1],
+                                     antisymmetric_edge_features=[2])
+    experiment_name = "edge_features_%f" % C
     #warm_start = True
     warm_start = False
     ssvm = learners.OneSlackSSVM(
-        model, verbose=2, C=C, max_iter=10, n_jobs=1,
+        model, verbose=2, C=C, max_iter=1000000, n_jobs=-1,
         tol=0.0001, show_loss_every=50, inference_cache=50, cache_tol='auto',
         logger=SaveLogger(experiment_name + ".pickle", save_every=100),
         inactive_threshold=1e-5, break_on_bad=False, inactive_window=50,
@@ -86,4 +86,4 @@ def main(C=1, test=False):
 if __name__ == "__main__":
     #for C in 10. ** np.arange(-4, 2):
         #main(C)
-    main(1, test=False)
+    main(.1, test=False)

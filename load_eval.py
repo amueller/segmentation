@@ -86,6 +86,7 @@ def main():
             if isinstance(ssvm.model, LatentNodeCRF):
                 Y_pred = [ssvm.model.label_from_latent(h) for h in Y_pred]
             Y_flat = np.hstack(data.Y)
+
             if dataset == 'msrc':
                 print("superpixel accuracy: %.2f"
                       % (np.mean((np.hstack(Y_pred) == Y_flat)[Y_flat != 21]) *

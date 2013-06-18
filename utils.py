@@ -103,3 +103,33 @@ def region_graph(regions):
     unique_crossings = np.c_[unique_hash % n_vertices,
                              unique_hash // n_vertices]
     return unique_crossings
+
+
+def get_edge_contrast(edges, image, superpixels):
+    r = np.bincount(superpixels.ravel(), weights=image[:, :, 0].ravel())
+    g = np.bincount(superpixels.ravel(), weights=image[:, :, 1].ravel())
+    b = np.bincount(superpixels.ravel(), weights=image[:, :, 2].ravel())
+    mean_colors = (np.vstack([r, g, b])
+                   / np.bincount(superpixels.ravel())).T / 255.
+    contrasts = [np.exp(-10. * np.linalg.norm(mean_colors[e[0]]
+                                              - mean_colors[e[1]]))
+                 for e in edges]
+    return np.vstack(contrasts)
+
+
+@memory.cache
+def get_edge_directions(edges, superpixels):
+    n_vertices = np.max(superpixels) + 1
+    centers = np.empty((n_vertices, 2))
+    gridx, gridy = np.mgrid[:superpixels.shape[0], :superpixels.shape[1]]
+
+    for v in xrange(n_vertices):
+        centers[v] = [gridy[superpixels == v].mean(),
+                      gridx[superpixels == v].mean()]
+    directions = []
+    for edge in edges:
+        e0, e1 = edge
+        diff = centers[e0] - centers[e1]
+        diff /= np.linalg.norm(diff)
+        directions.append(np.arcsin(diff[1]))
+    return np.vstack(directions)

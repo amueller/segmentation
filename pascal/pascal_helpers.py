@@ -8,6 +8,8 @@ from matplotlib.colors import ListedColormap
 from sklearn.externals.joblib import Memory
 from slic_python import slic_n
 
+from latent_crf_experiments.utils import get_edge_contrast, get_edge_directions
+
 
 memory = Memory(cachedir="/tmp/cache")
 pascal_path = "/home/local/datasets/VOC2011/TrainVal/VOCdevkit/VOC2011"
@@ -20,6 +22,11 @@ cmap = ListedColormap(colors)
 DataBunch = namedtuple('DataBunch', 'X, Y, file_names, superpixels')
 DataBunchNoSP = namedtuple('DataBunchNoSP', 'X, Y, file_names')
 
+classes = ['background', 'aeroplane', 'bicycle', 'bird', 'boat', 'bottle',
+           'bus', 'car', 'cat', 'chair', 'cow', 'diningtable', 'dog', 'horse',
+           'motorbike', 'person', 'pottedplant' 'sheep', 'sofa', 'train',
+           'tvmonitor', 'void']
+
 
 def load_image(filename):
     return imread(pascal_path + "/JPEGImages/%s.jpg" % filename)
@@ -27,6 +34,18 @@ def load_image(filename):
 
 def get_ground_truth(filename):
     return imread(pascal_path + "/SegmentationClass/%s.png" % filename)
+
+
+def add_edge_features(data):
+    X = []
+    for x, superpixels, file_name in zip(data.X, data.superpixels,
+                                         data.file_names):
+        features = [np.ones((x[1].shape[0], 1))]
+        image = load_image(file_name)
+        features.append(get_edge_contrast(x[1], image, superpixels))
+        features.append(get_edge_directions(x[1], superpixels))
+        X.append((x[0], x[1], np.hstack(features)))
+    return DataBunch(X, data.Y, data.file_names, data.superpixels)
 
 
 def load_kraehenbuehl(filename):
