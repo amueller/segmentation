@@ -11,9 +11,10 @@ from pystruct.models.latent_node_crf import kmeans_init
 from hierarchical_segmentation import plot_results_hierarchy
 from hierarchical_helpers import make_hierarchical_data
 from hierarchical_helpers import load_data_global_probs
-from msrc_helpers import (discard_void, add_edges, load_data,
+from msrc_helpers import (load_data,
                           add_kraehenbuehl_features)  # , add_edge_features)
 
+from latent_crf_experiments.utils import discard_void, add_edges
 from IPython.core.debugger import Tracer
 tracer = Tracer()
 

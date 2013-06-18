@@ -15,7 +15,7 @@ from sklearn.kernel_approximation import AdditiveChi2Sampler
 
 
 from datasets.msrc import MSRCDataset, colors, classes
-from ..utils import add_edges
+from latent_crf_experiments.utils import add_edges
 
 # stores information that was COMPUTED from the dataset + file names for
 # correspondence

@@ -17,6 +17,8 @@ from msrc.hierarchical_segmentation import plot_results_hierarchy
 #from hierarchical_helpers import load_data_global_probs
 from msrc.msrc_helpers import add_kraehenbuehl_features
 
+from pascal.pascal_helpers import load_pascal, eval_on_sp
+
 
 def main():
     argv = sys.argv
@@ -39,6 +41,11 @@ def main():
     if len(argv) <= 2:
         return
 
+    if len(argv) <= 3:
+        dataset = 'pascal'
+    else:
+        dataset = argv[3]
+
     if argv[2] == 'acc':
 
         ssvm.n_jobs = -1
@@ -48,8 +55,8 @@ def main():
         for data_str, title in zip(["train", "val"],
                                    ["TRAINING SET", "VALIDATION SET"]):
             print(title)
-            independent = True
-            #independent = False
+            #independent = True
+            independent = False
             if isinstance(ssvm.model, EdgeFeatureGraphCRF):
                 independent = False
 
@@ -57,7 +64,11 @@ def main():
                 independent = True
                 print("DAI DAI DAI")
             #data = load_data_global_probs(data_str, latent=True)
-            data = load_data(data_str, which="piecewise")
+            if dataset == 'msrc':
+                data = load_data(data_str, which="piecewise")
+            elif dataset == 'pascal':
+                data = load_pascal("train1" if data_str == 'train' else
+                                   "train2")
             data = add_edges(data, independent=independent)
             #data = add_kraehenbuehl_features(data, which="train_30px")
             #data = add_kraehenbuehl_features(data, which="train")
@@ -75,13 +86,17 @@ def main():
             if isinstance(ssvm.model, LatentNodeCRF):
                 Y_pred = [ssvm.model.label_from_latent(h) for h in Y_pred]
             Y_flat = np.hstack(data.Y)
-            print("superpixel accuracy: %.2f"
-                  % (np.mean((np.hstack(Y_pred) == Y_flat)[Y_flat != 21]) *
-                     100))
-            res = eval_on_pixels(data, Y_pred, print_results=True)
-            print("global: %.2f, average: %.2f" % (res['global'] * 100,
-                                                   res['average'] * 100))
-            plot_confusion_matrix(res['confusion'])
+            if dataset == 'msrc':
+                print("superpixel accuracy: %.2f"
+                      % (np.mean((np.hstack(Y_pred) == Y_flat)[Y_flat != 21]) *
+                         100))
+                res = eval_on_pixels(data, Y_pred, print_results=True)
+                print("global: %.2f, average: %.2f" % (res['global'] * 100,
+                                                       res['average'] * 100))
+                plot_confusion_matrix(res['confusion'])
+            elif dataset == 'pascal':
+                eval_on_sp(data, Y_pred, print_results=True)
+
         plt.show()
 
     elif argv[2] == 'plot':
