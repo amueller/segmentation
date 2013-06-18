@@ -19,8 +19,8 @@ def main(C=1, test=False):
     # load training data
     independent = True
     data_train = load_pascal("train1")
-    data_train = discard_void(data_train, 255)
     data_train = add_edges(data_train, independent=independent)
+    data_train = discard_void(data_train, 255)
     #data_train = add_kraehenbuehl_features(data_train, which="train_30px")
     #data_train = add_kraehenbuehl_features(data_train, which="train")
 
@@ -54,8 +54,8 @@ def main(C=1, test=False):
     #warm_start = True
     warm_start = False
     ssvm = learners.OneSlackSSVM(
-        model, verbose=2, C=C, max_iter=100000, n_jobs=-1,
-        tol=0.0001, show_loss_every=50, inference_cache=0, cache_tol='auto',
+        model, verbose=2, C=C, max_iter=10, n_jobs=1,
+        tol=0.0001, show_loss_every=50, inference_cache=50, cache_tol='auto',
         logger=SaveLogger(experiment_name + ".pickle", save_every=100),
         inactive_threshold=1e-5, break_on_bad=False, inactive_window=50,
         switch_to_ad3=False)
@@ -80,8 +80,8 @@ def main(C=1, test=False):
 
     print("fit finished!")
     data_val = load_pascal('train2')
-    eval_on_sp(data_val, [ssvm.predict(x) for x in data_val.X],
-               print_results=True)
+    data_val = add_edges(data_val, independent=independent)
+    eval_on_sp(data_val, ssvm.predict(data_val.X), print_results=True)
 
 if __name__ == "__main__":
     #for C in 10. ** np.arange(-4, 2):
