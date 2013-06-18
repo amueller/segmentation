@@ -4,10 +4,16 @@ import matplotlib.pyplot as plt
 from skimage.segmentation import mark_boundaries
 from sklearn.svm import LinearSVC
 
+from sklearn.cross_validation import LeavePLabelOut
+from sklearn.grid_search import GridSearchCV
+from sklearn.utils import shuffle
+from sklearn.metrics import recall_score, Scorer
+
 from pascal_helpers import (load_pascal, load_image, cmap, eval_on_pixels,
                             load_kraehenbuehl, eval_on_sp, gt_in_sp,
                             get_ground_truth, load_pascal_pixelwise)
 
+#from msrc_helpers import SimpleSplitCV
 
 from IPython.core.debugger import Tracer
 tracer = Tracer()
@@ -17,14 +23,39 @@ np.set_printoptions(precision=2)
 def train_svm(C=0.1):
     data_train = load_pascal()
     svm = LinearSVC(C=C, dual=False, class_weight='auto')
-    X = np.vstack(data_train.X)
-    y = np.hstack(data_train.y)
+    X, y = shuffle(data_train.X, data_train.Y)
+    # prepare leave-one-label-out by assigning labels to images
+    image_indicators = np.hstack([np.repeat(i, len(x)) for i, x in
+                                  enumerate(X)])
+    # go down to only 5 "folds"
+    labels = image_indicators % 5
+    X, y = np.vstack(X), np.hstack(y)
+    #X_train, X_test, y_train, y_test = train_test_split(
+        #data_train.X, data_train.Y, random_state=0)
+
+    #X_train, y_train = np.vstack(X_train), np.hstack(y_train)
+    #X_test, y_test = np.vstack(X_test), np.hstack(y_test)
+    #n_test = len(X) // 5
+    #n_train = len(X) - n_test
+    #cv = SimpleSplitCV(n_train, n_test)
+    cv = LeavePLabelOut(labels=labels, p=1)
+    param_grid = {'C': 10. ** np.arange(-3, 3)}
+    scorer = Scorer(recall_score, average="macro")
+    grid_search = GridSearchCV(svm, param_grid=param_grid, cv=cv, verbose=10,
+                               scoring=scorer, n_jobs=-1)
+    grid_search.fit(X, y)
+
     tracer()
 
-    svm.fit(X, y)
-    print(svm.score(X, y))
-    eval_on_sp(data_train, [svm.predict(x) for x in data_train.X],
-               print_results=True)
+    #svm.fit(X, y)
+    #print(svm.score(X, y))
+    #eval_on_sp(data_train, [svm.predict(x) for x in data_train.X],
+               #print_results=True)
+
+    #data_val = load_pascal("val")
+    #eval_on_sp(data_val, [svm.predict(x) for x in data_val.X],
+               #print_results=True)
+    tracer()
 
 
 def visualize_pascal(plot_probabilities=False):
@@ -84,10 +115,8 @@ def eval_pixel_best_possible():
     tracer()
 
 if __name__ == "__main__":
-    #for C in 10. ** np.arange(-4, 2):
-        #main(C)
-    #main(.01, test=False)
     #visualize_pascal()
     #eval_pixel_best_possible()
     #eval_pixel_prediction()
-    eval_sp_prediction()
+    #eval_sp_prediction()
+    train_svm(C=1)
