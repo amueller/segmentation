@@ -84,41 +84,6 @@ def main():
             plot_confusion_matrix(res['confusion'])
         plt.show()
 
-    elif argv[2] == 'curves':
-        fig, axes = plt.subplots(1, 2)
-        if hasattr(ssvm, 'timestamps_'):
-            print("loading timestamps")
-            inds = np.array(ssvm.timestamps_)
-            inds = inds[2:len(ssvm.objective_curve_) + 1] / 60.
-            inds = np.hstack([inds, [inds[-1]]])
-            axes[0].set_xlabel('training time (min)')
-            axes[1].set_xlabel('training time (min)')
-        else:
-            inds = np.arange(len(ssvm.objective_curve_))
-            axes[0].set_xlabel('QP iterations')
-            axes[1].set_xlabel('QP iterations')
-
-        axes[0].set_title("Objective")
-        axes[0].plot(inds, ssvm.objective_curve_, label="dual")
-        axes[0].set_yscale('log')
-        if hasattr(ssvm, "primal_objective_curve_"):
-            axes[0].plot(inds, ssvm.primal_objective_curve_,
-                         label="cached primal" if inference_run is not None
-                         else "primal")
-        if inference_run is not None:
-            inference_run = inference_run[:len(ssvm.objective_curve_)]
-            axes[0].plot(inds[inference_run],
-                         np.array(ssvm.primal_objective_curve_)[inference_run],
-                         'o', label="primal")
-        axes[0].legend()
-        try:
-            axes[1].plot(inds[::ssvm.show_loss_every], ssvm.loss_curve_)
-        except:
-            axes[1].plot(ssvm.loss_curve_)
-        axes[1].set_title("Training Error")
-        axes[1].set_yscale('log')
-        plt.show()
-
     elif argv[2] == 'plot':
         data_str = 'val'
         if len(argv) <= 3:
