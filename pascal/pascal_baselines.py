@@ -20,41 +20,37 @@ tracer = Tracer()
 np.set_printoptions(precision=2)
 
 
-def train_svm(C=0.1):
-    data_train = load_pascal()
+def train_svm(C=0.1, grid=False):
     svm = LinearSVC(C=C, dual=False, class_weight='auto')
-    X, y = shuffle(data_train.X, data_train.Y)
-    # prepare leave-one-label-out by assigning labels to images
-    image_indicators = np.hstack([np.repeat(i, len(x)) for i, x in
-                                  enumerate(X)])
-    # go down to only 5 "folds"
-    labels = image_indicators % 5
-    X, y = np.vstack(X), np.hstack(y)
-    #X_train, X_test, y_train, y_test = train_test_split(
-        #data_train.X, data_train.Y, random_state=0)
 
-    #X_train, y_train = np.vstack(X_train), np.hstack(y_train)
-    #X_test, y_test = np.vstack(X_test), np.hstack(y_test)
-    #n_test = len(X) // 5
-    #n_train = len(X) - n_test
-    #cv = SimpleSplitCV(n_train, n_test)
-    cv = LeavePLabelOut(labels=labels, p=1)
-    param_grid = {'C': 10. ** np.arange(-3, 3)}
-    scorer = Scorer(recall_score, average="macro")
-    grid_search = GridSearchCV(svm, param_grid=param_grid, cv=cv, verbose=10,
-                               scoring=scorer, n_jobs=-1)
-    grid_search.fit(X, y)
+    if grid:
+        data_train = load_pascal("train")
+        X, y = shuffle(data_train.X, data_train.Y)
+        # prepare leave-one-label-out by assigning labels to images
+        image_indicators = np.hstack([np.repeat(i, len(x)) for i, x in
+                                      enumerate(X)])
+        # go down to only 5 "folds"
+        labels = image_indicators % 5
+        X, y = np.vstack(X), np.hstack(y)
 
-    tracer()
+        cv = LeavePLabelOut(labels=labels, p=1)
+        param_grid = {'C': 10. ** np.arange(-3, 3)}
+        scorer = Scorer(recall_score, average="macro")
+        grid_search = GridSearchCV(svm, param_grid=param_grid, cv=cv,
+                                   verbose=10, scoring=scorer, n_jobs=-1)
+        grid_search.fit(X, y)
+    else:
+        data_train = load_pascal("train1")
+        X, y = np.vstack(data_train.X), np.hstack(data_train.Y)
+        svm.fit(X, y)
+        print(svm.score(X, y))
+        eval_on_sp(data_train, [svm.predict(x) for x in data_train.X],
+                   print_results=True)
 
-    #svm.fit(X, y)
-    #print(svm.score(X, y))
-    #eval_on_sp(data_train, [svm.predict(x) for x in data_train.X],
-               #print_results=True)
+        data_val = load_pascal("train2")
+        eval_on_sp(data_val, [svm.predict(x) for x in data_val.X],
+                   print_results=True)
 
-    #data_val = load_pascal("val")
-    #eval_on_sp(data_val, [svm.predict(x) for x in data_val.X],
-               #print_results=True)
     tracer()
 
 
