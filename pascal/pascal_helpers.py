@@ -61,9 +61,20 @@ def gt_in_sp(filename, superpixels):
     return np.argmax(votes.toarray(), axis=0)
 
 
+def generate_pascal_split():
+    # split the training set into train1 and train2 for validation
+    base_path = pascal_path + "/ImageSets/Segmentation/"
+    files = np.loadtxt(base_path + "train.txt", dtype=np.str)
+    np.random.seed(0)
+    inds = np.random.permutation(len(files))
+    n_train2 = len(files) // 5
+    np.savetxt(base_path + "train1.txt", files[inds > n_train2], fmt="%s")
+    np.savetxt(base_path + "train2.txt", files[inds < n_train2], fmt="%s")
+
+
 @memory.cache
 def load_pascal(which='train', year="2010"):
-    if which not in ["train", "val"]:
+    if which not in ["train", "val", "train1", "train2"]:
         raise ValueError("Expected 'which' to be 'train' or 'val', got %s." %
                          which)
     split_file = pascal_path + "/ImageSets/Segmentation/%s.txt" % which
