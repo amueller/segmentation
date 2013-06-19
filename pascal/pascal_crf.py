@@ -81,6 +81,7 @@ def main(C=1, test=False):
     print("fit finished!")
     data_val = load_pascal('train2')
     data_val = add_edges(data_val, independent=independent)
+    data_val = add_edge_features(data_val)
     eval_on_sp(data_val, ssvm.predict(data_val.X), print_results=True)
 
 if __name__ == "__main__":
