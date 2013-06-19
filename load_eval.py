@@ -9,15 +9,14 @@ import numpy as np
 from pystruct.utils import SaveLogger
 from pystruct.models import LatentNodeCRF, EdgeFeatureGraphCRF
 
-from msrc.msrc_helpers import (plot_results, add_edge_features, add_edges,
-                               eval_on_pixels, load_data,
-                               plot_confusion_matrix)
-from msrc.hierarchical_crf import make_hierarchical_data
-from msrc.hierarchical_segmentation import plot_results_hierarchy
+from msrc import msrc_helpers
+#from msrc.hierarchical_crf import make_hierarchical_data
+#from msrc.hierarchical_segmentation import plot_results_hierarchy
 #from hierarchical_helpers import load_data_global_probs
-from msrc.msrc_helpers import add_kraehenbuehl_features
 
-from pascal.pascal_helpers import load_pascal, eval_on_sp
+from utils import add_edges
+
+from pascal import pascal_helpers
 
 
 def main():
@@ -65,17 +64,20 @@ def main():
                 print("DAI DAI DAI")
             #data = load_data_global_probs(data_str, latent=True)
             if dataset == 'msrc':
-                data = load_data(data_str, which="piecewise")
+                data = msrc_helpers.load_data(data_str, which="piecewise")
             elif dataset == 'pascal':
-                data = load_pascal("train1" if data_str == 'train' else
-                                   "train2")
+                data = pascal_helpers.load_pascal("train1" if data_str ==
+                                                  'train' else "train2")
             data = add_edges(data, independent=independent)
             #data = add_kraehenbuehl_features(data, which="train_30px")
             #data = add_kraehenbuehl_features(data, which="train")
             # may Guido have mercy on my soul
             #(I renamed the module after pickling)
             if type(ssvm.model).__name__ == 'EdgeFeatureGraphCRF':
-                data = add_edge_features(data)
+                if dataset == 'pascal':
+                    data = pascal_helpers.add_edge_features(data)
+                elif dataset == 'msrc':
+                    data = msrc_helpers.add_edge_features(data)
 
             #if isinstance(ssvm.model, LatentNodeCRF):
                 #data = make_hierarchical_data(data, lateral=True, latent=True,
@@ -91,37 +93,38 @@ def main():
                 print("superpixel accuracy: %.2f"
                       % (np.mean((np.hstack(Y_pred) == Y_flat)[Y_flat != 21]) *
                          100))
-                res = eval_on_pixels(data, Y_pred, print_results=True)
+                res = msrc_helpers.eval_on_pixels(data, Y_pred,
+                                                  print_results=True)
                 print("global: %.2f, average: %.2f" % (res['global'] * 100,
                                                        res['average'] * 100))
-                plot_confusion_matrix(res['confusion'])
+                msrc_helpers.plot_confusion_matrix(res['confusion'])
             elif dataset == 'pascal':
-                eval_on_sp(data, Y_pred, print_results=True)
+                pascal_helpers.eval_on_sp(data, Y_pred, print_results=True)
 
         plt.show()
 
-    elif argv[2] == 'plot':
-        data_str = 'val'
-        if len(argv) <= 3:
-            raise ValueError("Need a folder name for plotting.")
-        data = load_data(data_str, which="piecewise")
-        data = add_edges(data, independent=False)
-        data = add_kraehenbuehl_features(data, which="train_30px")
-        data = add_kraehenbuehl_features(data, which="train")
-        if type(ssvm.model).__name__ == 'EdgeFeatureGraphCRF':
-            data = add_edge_features(data)
-        #ssvm.model.inference_method = 'qpbo'
-        if isinstance(ssvm.model, LatentNodeCRF):
-            data = make_hierarchical_data(data, lateral=True, latent=True)
-            try:
-                Y_pred = ssvm.predict_latent(data.X)
-            except AttributeError:
-                Y_pred = ssvm.predict(data.X)
+    #elif argv[2] == 'plot':
+        #data_str = 'val'
+        #if len(argv) <= 3:
+            #raise ValueError("Need a folder name for plotting.")
+        #data = load_data(data_str, which="piecewise")
+        #data = add_edges(data, independent=False)
+        #data = add_kraehenbuehl_features(data, which="train_30px")
+        #data = add_kraehenbuehl_features(data, which="train")
+        #if type(ssvm.model).__name__ == 'EdgeFeatureGraphCRF':
+            #data = add_edge_features(data)
+        ##ssvm.model.inference_method = 'qpbo'
+        #if isinstance(ssvm.model, LatentNodeCRF):
+            #data = make_hierarchical_data(data, lateral=True, latent=True)
+            #try:
+                #Y_pred = ssvm.predict_latent(data.X)
+            #except AttributeError:
+                #Y_pred = ssvm.predict(data.X)
 
-            plot_results_hierarchy(data, Y_pred, argv[3])
-        else:
-            Y_pred = ssvm.predict(data.X)
-            plot_results(data, Y_pred, argv[3])
+            #plot_results_hierarchy(data, Y_pred, argv[3])
+        #else:
+            #Y_pred = ssvm.predict(data.X)
+            #plot_results(data, Y_pred, argv[3])
 
 
 if __name__ == "__main__":
