@@ -38,7 +38,7 @@ def main():
                ssvm.objective_curve_[-1]))
 
     if len(argv) <= 2:
-        return
+        argv.append("acc")
 
     if len(argv) <= 3:
         dataset = 'pascal'
@@ -99,7 +99,10 @@ def main():
                                                        res['average'] * 100))
                 msrc_helpers.plot_confusion_matrix(res['confusion'])
             elif dataset == 'pascal':
-                pascal_helpers.eval_on_sp(data, Y_pred, print_results=True)
+                print("superpixel accuracy: %.2f"
+                      % (np.mean((np.hstack(Y_pred) == Y_flat)[Y_flat != 255])
+                         * 100))
+                #pascal_helpers.eval_on_sp(data, Y_pred, print_results=True)
 
         plt.show()
 
