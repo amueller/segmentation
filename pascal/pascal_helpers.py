@@ -24,7 +24,7 @@ DataBunchNoSP = namedtuple('DataBunchNoSP', 'X, Y, file_names')
 
 classes = ['background', 'aeroplane', 'bicycle', 'bird', 'boat', 'bottle',
            'bus', 'car', 'cat', 'chair', 'cow', 'diningtable', 'dog', 'horse',
-           'motorbike', 'person', 'pottedplant' 'sheep', 'sofa', 'train',
+           'motorbike', 'person', 'potted plant', 'sheep', 'sofa', 'train',
            'tvmonitor', 'void']
 
 
