@@ -1,10 +1,18 @@
+import os
+import matplotlib.pyplot as plt
+from scipy.misc import imsave
+from skimage.segmentation import mark_boundaries
+
 import numpy as np
 from collections import namedtuple
 from scipy import sparse
 
 from msrc_helpers import (DataBunch, load_data, sigm, add_edges,
                           add_kraehenbuehl_features)
-from hierarchical_segmentation import get_segment_features
+from msrc_helpers import MSRCDataset, colors, classes
+from latent_crf_experiments.hierarchical_segmentation import \
+    (get_segment_features, get_km_segments)
+
 
 HierarchicalDataBunch = namedtuple('HierarchicalDataBunch', 'X, Y, file_names,'
                                    'superpixels, segments')
@@ -72,7 +80,6 @@ def load_data_global_probs(dataset="train", latent=False):
 
 def make_hierarchical_data(data, lateral=False, latent=False,
                            latent_lateral=False):
-    from datasets.msrc import MSRCDataset
     msrc = MSRCDataset()
     images = [msrc.get_image(f) for f in data.file_names]
     segment_features = [get_segment_features(*stuff)
@@ -122,3 +129,72 @@ def make_hierarchical_data(data, lateral=False, latent=False,
 
     return HierarchicalDataBunch(X_stacked, Y_stacked, data.file_names,
                                  data.superpixels, all_segments)
+
+
+def plot_results_hierarchy(data, Y_pred, folder="figures"):
+    if not os.path.exists(folder):
+        os.mkdir(folder)
+    msrc = MSRCDataset()
+    import matplotlib.colors as cl
+    np.random.seed(0)
+    random_colormap = cl.ListedColormap(np.random.uniform(size=(100, 3)))
+    for stuff in zip(data.file_names, data.superpixels,
+                     data.segments, data.Y, Y_pred):
+        image_name, superpixels, segments, y, y_pred = stuff
+        image = msrc.get_image(image_name)
+        h = y_pred[len(y):]
+        y_pred = y_pred[:len(y)]
+
+        fig, axes = plt.subplots(2, 3, figsize=(12, 6))
+
+        axes[0, 0].imshow(image)
+        axes[0, 1].set_title("ground truth")
+        axes[0, 1].imshow(image)
+        gt = msrc.get_ground_truth(image_name)
+        axes[0, 1].imshow(colors[gt], alpha=.7)
+        axes[1, 0].set_title("sp ground truth")
+        axes[1, 0].imshow(image)
+        axes[1, 0].imshow(colors[y[superpixels]], vmin=0, vmax=23, alpha=.7)
+
+        axes[1, 1].set_title("prediction")
+        axes[1, 1].imshow(image)
+        axes[1, 1].imshow(colors[y_pred[superpixels]], vmin=0, vmax=23,
+                          alpha=.7)
+        present_y = np.unique(np.hstack([y, y_pred]))
+
+        vmax = np.max(np.hstack(Y_pred))
+        vmin = np.min(np.hstack(Y_pred))
+        axes[1, 2].imshow(mark_boundaries(image, segments[superpixels]))
+        axes[1, 2].imshow(h[segments[superpixels]], vmin=vmin, vmax=vmax,
+                          alpha=.7, cmap=random_colormap)
+
+        axes[0, 2].imshow(colors[present_y, :][:, np.newaxis, :],
+                          interpolation='nearest', alpha=.7)
+        for i, c in enumerate(present_y):
+            axes[0, 2].text(1, i, classes[c])
+        for ax in axes.ravel():
+            ax.set_xticks(())
+            ax.set_yticks(())
+        fig.savefig(folder + "/%s.png" % image_name, bbox_inches="tight")
+        plt.close(fig)
+
+
+def main():
+    import cPickle
+    from datasets.msrc import MSRCDataset
+    with open("../superpixel_crf/data_probs_train_cw.pickle") as f:
+        data = cPickle.load(f)
+    data = add_edges(data, independent=False)
+    msrc = MSRCDataset()
+    #X, Y, image_names, images, all_superpixels = load_data(
+        #"train", independent=False)
+    for x, name, sps in zip(data.X, data.file_names, data.superpixels):
+        segments = get_km_segments(x, msrc.get_image(name), sps, n_segments=10)
+        boundary_image = mark_boundaries(mark_boundaries(msrc.get_image(name),
+                                                         sps), segments[sps],
+                                         color=[1, 0, 0])
+        imsave("hierarchy_sp_own_10/%s.png" % name, boundary_image)
+
+
+if __name__ == "__main__":
+    main()
