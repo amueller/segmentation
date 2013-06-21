@@ -19,10 +19,13 @@ def main(C=1, test=False):
     # load training data
     independent = False
     data_train = load_pascal("train1")
+    if test:
+        data_train = load_pascal("train")
+    else:
+        data_train = load_pascal("train1")
+
     data_train = add_edges(data_train, independent=independent)
     data_train = discard_void(data_train, 255)
-    #data_train = add_kraehenbuehl_features(data_train, which="train_30px")
-    #data_train = add_kraehenbuehl_features(data_train, which="train")
 
     #data_train = load_data_global_probs()
 
@@ -79,7 +82,10 @@ def main(C=1, test=False):
     ssvm.fit(data_train.X, data_train.Y, warm_start=warm_start)
 
     print("fit finished!")
-    data_val = load_pascal('train2')
+    if test:
+        data_val = load_pascal('val')
+    else:
+        data_val = load_pascal('train2')
     data_val = add_edges(data_val, independent=independent)
     data_val = add_edge_features(data_val)
     eval_on_sp(data_val, ssvm.predict(data_val.X), print_results=True)
