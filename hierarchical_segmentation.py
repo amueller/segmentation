@@ -158,5 +158,56 @@ def main():
         imsave("hierarchy_sp_own_25/%s.png" % name, boundary_image)
 
 
+def plot_results_hierarchy(dataset, data, Y_pred, folder="figures"):
+    import os
+    import matplotlib.pyplot as plt
+    from skimage.segmentation import mark_boundaries
+    if not os.path.exists(folder):
+        os.mkdir(folder)
+    import matplotlib.colors as cl
+    np.random.seed(0)
+    random_colormap = cl.ListedColormap(np.random.uniform(size=(100, 3)))
+    for stuff in zip(data.file_names, data.superpixels,
+                     data.segments, data.Y, Y_pred):
+        image_name, superpixels, segments, y, y_pred = stuff
+        image = dataset.get_image(image_name)
+        h = y_pred[len(y):]
+        y_pred = y_pred[:len(y)]
+
+        fig, axes = plt.subplots(2, 3, figsize=(12, 6))
+
+        axes[0, 0].imshow(image)
+        axes[0, 1].set_title("ground truth")
+        axes[0, 1].imshow(image)
+        gt = dataset.get_ground_truth(image_name)
+        axes[0, 1].imshow(gt, alpha=.7, cmap=dataset.cmap)
+        axes[1, 0].set_title("sp ground truth")
+        axes[1, 0].imshow(image)
+        axes[1, 0].imshow(y[superpixels], vmin=0, vmax=23, alpha=.7,
+                          cmap=dataset.cmap)
+
+        axes[1, 1].set_title("prediction")
+        axes[1, 1].imshow(image)
+        axes[1, 1].imshow(y_pred[superpixels], vmin=0, vmax=23,
+                          alpha=.7, cmap=dataset.cmap)
+        present_y = np.unique(np.hstack([y, y_pred]))
+
+        vmax = np.max(np.hstack(Y_pred))
+        vmin = np.min(np.hstack(Y_pred))
+        axes[1, 2].imshow(mark_boundaries(image, segments[superpixels]))
+        axes[1, 2].imshow(h[segments[superpixels]], vmin=vmin, vmax=vmax,
+                          alpha=.7, cmap=random_colormap)
+
+        axes[0, 2].imshow(present_y[np.newaxis, :], interpolation='nearest',
+                          alpha=.7, cmap=dataset.cmap)
+        for i, c in enumerate(present_y):
+            axes[0, 2].text(1, i, dataset.classes[c])
+        for ax in axes.ravel():
+            ax.set_xticks(())
+            ax.set_yticks(())
+        fig.savefig(folder + "/%s.png" % image_name, bbox_inches="tight")
+        plt.close(fig)
+
+
 if __name__ == "__main__":
     main()
