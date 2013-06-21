@@ -102,7 +102,10 @@ def main():
                 print("superpixel accuracy: %.2f"
                       % (np.mean((np.hstack(Y_pred) == Y_flat)[Y_flat != 255])
                          * 100))
-                #pascal_helpers.eval_on_sp(data, Y_pred, print_results=True)
+                hamming, jaccard = pascal_helpers.eval_on_sp(
+                    data, Y_pred, print_results=False)
+                print("Jaccard: %.2f, Hamming: %.2f" % (jaccard.mean(),
+                                                        hamming.mean()))
 
         plt.show()
 
