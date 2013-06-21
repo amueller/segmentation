@@ -109,28 +109,45 @@ def main():
 
         plt.show()
 
-    #elif argv[2] == 'plot':
-        #data_str = 'val'
-        #if len(argv) <= 3:
-            #raise ValueError("Need a folder name for plotting.")
-        #data = load_data(data_str, which="piecewise")
-        #data = add_edges(data, independent=False)
-        #data = add_kraehenbuehl_features(data, which="train_30px")
-        #data = add_kraehenbuehl_features(data, which="train")
-        #if type(ssvm.model).__name__ == 'EdgeFeatureGraphCRF':
-            #data = add_edge_features(data)
-        ##ssvm.model.inference_method = 'qpbo'
-        #if isinstance(ssvm.model, LatentNodeCRF):
-            #data = make_hierarchical_data(data, lateral=True, latent=True)
-            #try:
-                #Y_pred = ssvm.predict_latent(data.X)
-            #except AttributeError:
-                #Y_pred = ssvm.predict(data.X)
+    elif argv[2] == 'plot':
+        data_str = 'val'
+        if len(argv) <= 4:
+            raise ValueError("Need a folder name for plotting.")
+        if dataset == "msrc":
+            data = msrc_helpers.load_data(data_str, which="piecewise")
+            data = add_edges(data, independent=False)
+            data = msrc_helpers.add_kraehenbuehl_features(
+                data, which="train_30px")
+            data = msrc_helpers.add_kraehenbuehl_features(
+                data, which="train")
+            if type(ssvm.model).__name__ == 'EdgeFeatureGraphCRF':
+                data = msrc_helpers.add_edge_features(data)
+            #ssvm.model.inference_method = 'qpbo'
+            if isinstance(ssvm.model, LatentNodeCRF):
+                data = msrc_helpers.make_hierarchical_data(data, lateral=True,
+                                                           latent=True)
+                try:
+                    Y_pred = ssvm.predict_latent(data.X)
+                except AttributeError:
+                    Y_pred = ssvm.predict(data.X)
 
-            #plot_results_hierarchy(data, Y_pred, argv[3])
-        #else:
-            #Y_pred = ssvm.predict(data.X)
-            #plot_results(data, Y_pred, argv[3])
+                msrc_helpers.plot_results_hierarchy(data, Y_pred, argv[4])
+            else:
+                Y_pred = ssvm.predict(data.X)
+                msrc_helpers.plot_results(data, Y_pred, argv[4])
+
+        elif dataset == "pascal":
+                data = pascal_helpers.load_pascal("val")
+                data = add_edges(data)
+                if type(ssvm.model).__name__ == 'EdgeFeatureGraphCRF':
+                    data = pascal_helpers.add_edge_features(data)
+                Y_pred = ssvm.predict(data.X)
+                pascal_helpers.plot_results(data, Y_pred, argv[4])
+                #ssvm.model.inference_method = 'qpbo'
+                #if isinstance(ssvm.model, LatentNodeCRF):
+                    #data = pascal_helpers.make_hierarchical_data(data,
+                                                                 #lateral=True,
+                                                                 #latent=True)
 
 
 if __name__ == "__main__":
