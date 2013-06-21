@@ -4,30 +4,14 @@ from scipy.misc import imsave
 from skimage.segmentation import mark_boundaries
 
 import numpy as np
-from collections import namedtuple
 from scipy import sparse
 
 from msrc_helpers import (DataBunch, load_data, sigm, add_edges,
                           add_kraehenbuehl_features)
 from msrc_helpers import MSRCDataset, colors, classes
 from latent_crf_experiments.hierarchical_segmentation import \
-    (get_segment_features, get_km_segments)
-
-
-HierarchicalDataBunch = namedtuple('HierarchicalDataBunch', 'X, Y, file_names,'
-                                   'superpixels, segments')
-
-
-def make_hierarchy_edges(segments, superpixels):
-    all_edges = []
-    for seg, sps in zip(segments, superpixels):
-        seg = seg[sps]
-        edges = np.vstack([seg.ravel() + sps.max() + 1, sps.ravel()])
-        edge_matrix = sparse.coo_matrix((np.ones(edges.shape[1]), edges))
-        # make edges unique
-        edges = np.vstack(edge_matrix.tocsr().nonzero()).T
-        all_edges.append(edges)
-    return all_edges
+    (get_segment_features, get_km_segments, make_hierarchy_edges,
+     HierarchicalDataBunch)
 
 
 def add_top_node(data):
