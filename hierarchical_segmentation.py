@@ -85,6 +85,7 @@ def get_segment_features(x, y, image, sps):
     return segments, features, np.array(labels), edges
 
 
+@memory.cache
 def make_hierarchical_data(dataset, data, lateral=False, latent=False,
                            latent_lateral=False):
     images = [dataset.get_image(f) for f in data.file_names]
