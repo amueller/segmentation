@@ -10,8 +10,8 @@ from pystruct.utils import SaveLogger
 
 from datasets.pascal import PascalSegmentation
 from pascal_helpers import load_pascal
-from latent_crf_experiments.utils import (discard_void, add_edges,
-                                          add_edge_features)
+from latent_crf_experiments.utils import discard_void, add_edges
+                                          #add_edge_features)
 from latent_crf_experiments.hierarchical_segmentation import \
     make_hierarchical_data
 
@@ -26,11 +26,11 @@ def svm_on_segments(C=.1, learning_rate=.001, subgradient=False):
     latent = True
     data_train = load_pascal("train1")
     data_train = add_edges(data_train)
-    if lateral:
-        data_train = add_edge_features(data_train)
+    #if lateral:
+        #data_train = add_edge_features(ds, data_train)
     X_org_ = data_train.X
     data_train = make_hierarchical_data(ds, data_train, lateral=lateral,
-                                        latent=latent, latent_lateral=True)
+                                        latent=latent, latent_lateral=False)
     data_train = discard_void(ds, data_train)
     X_, Y_ = data_train.X, data_train.Y
     # remove edges
@@ -47,7 +47,7 @@ def svm_on_segments(C=.1, learning_rate=.001, subgradient=False):
                               n_features=data_train.X[0][0].shape[1],
                               n_hidden_states=5, inference_method='qpbo' if
                               lateral else 'dai', class_weight=class_weights,
-                              latent_node_features=True)
+                              latent_node_features=False)
         if subgradient:
             ssvm = learners.LatentSubgradientSSVM(
                 model, C=C, verbose=1, show_loss_every=10, logger=logger,
