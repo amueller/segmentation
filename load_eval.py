@@ -16,7 +16,7 @@ from latent_crf_experiments.hierarchical_segmentation import \
 from datasets.msrc import MSRC21Dataset
 from datasets.pascal import PascalSegmentation
 
-from utils import add_edges, eval_on_sp
+from utils import add_edges, eval_on_sp, add_edge_features
 
 from pascal import pascal_helpers
 
@@ -70,18 +70,17 @@ def main():
                 data = msrc_helpers.load_data(data_str, which="piecewise")
             elif dataset == 'pascal':
                 ds = PascalSegmentation()
-                data = pascal_helpers.load_pascal("train1" if data_str ==
-                                                  'train' else "train2")
-            data = add_edges(data, independent=independent)
+                #data = pascal_helpers.load_pascal("train1" if data_str ==
+                                                  #'train' else "train2")
+                data = pascal_helpers.load_pascal(data_str)
+            data = add_edges(data, "independent" if independent else
+                             "pairwise")
             #data = add_kraehenbuehl_features(data, which="train_30px")
             #data = add_kraehenbuehl_features(data, which="train")
             # may Guido have mercy on my soul
             #(I renamed the module after pickling)
             if type(ssvm.model).__name__ == 'EdgeFeatureGraphCRF':
-                if dataset == 'pascal':
-                    data = pascal_helpers.add_edge_features(data)
-                elif dataset == 'msrc':
-                    data = msrc_helpers.add_edge_features(data)
+                data = add_edge_features(ds, data)
 
             if isinstance(ssvm.model, LatentNodeCRF):
                 data = make_hierarchical_data(ds, data, lateral=True,
