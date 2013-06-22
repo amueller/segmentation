@@ -205,10 +205,10 @@ def gt_in_sp(dataset, filename, superpixels):
     return np.argmax(votes.toarray(), axis=0)
 
 
-def eval_on_pixels(Y_true, Y_pred, print_results=False):
+def eval_on_pixels(dataset, Y_true, Y_pred, print_results=False):
     tp, tn, fp, fn = np.zeros(21), np.zeros(21), np.zeros(21), np.zeros(21)
     for y_true, y_pred in zip(Y_true, Y_pred):
-        mask = y_true != 255  # don't care at borders
+        mask = y_true != dataset.void_label
         y_true, y_pred = y_true[mask], y_pred[mask]
         for k in range(21):
             tp[k] += np.sum((y_true == k) * (y_pred == k))
@@ -233,4 +233,5 @@ def eval_on_sp(dataset, data, Y_pred, print_results=False):
     Y_pred_pixels = [y_pred[sp] for sp, y_pred in zip(data.superpixels,
                                                       Y_pred)]
     Y_true = [dataset.get_ground_truth(f) for f in data.file_names]
-    return eval_on_pixels(Y_true, Y_pred_pixels, print_results=print_results)
+    return eval_on_pixels(dataset, Y_true, Y_pred_pixels,
+                          print_results=print_results)
