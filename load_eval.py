@@ -10,11 +10,13 @@ from pystruct.utils import SaveLogger
 from pystruct.models import LatentNodeCRF, EdgeFeatureGraphCRF
 
 from msrc import msrc_helpers
-#from msrc.hierarchical_crf import make_hierarchical_data
-#from msrc.hierarchical_segmentation import plot_results_hierarchy
-#from hierarchical_helpers import load_data_global_probs
+from latent_crf_experiments.hierarchical_segmentation import \
+    make_hierarchical_data
 
-from utils import add_edges
+from datasets.msrc import MSRC21Dataset
+from datasets.pascal import PascalSegmentation
+
+from utils import add_edges, eval_on_sp
 
 from pascal import pascal_helpers
 
@@ -64,8 +66,10 @@ def main():
                 print("DAI DAI DAI")
             #data = load_data_global_probs(data_str, latent=True)
             if dataset == 'msrc':
+                ds = MSRC21Dataset()
                 data = msrc_helpers.load_data(data_str, which="piecewise")
             elif dataset == 'pascal':
+                ds = PascalSegmentation()
                 data = pascal_helpers.load_pascal("train1" if data_str ==
                                                   'train' else "train2")
             data = add_edges(data, independent=independent)
@@ -79,9 +83,10 @@ def main():
                 elif dataset == 'msrc':
                     data = msrc_helpers.add_edge_features(data)
 
-            #if isinstance(ssvm.model, LatentNodeCRF):
-                #data = make_hierarchical_data(data, lateral=True, latent=True,
-                                              #latent_lateral=True)
+            if isinstance(ssvm.model, LatentNodeCRF):
+                data = make_hierarchical_data(ds, data, lateral=True,
+                                              latent=True,
+                                              latent_lateral=False)
             ssvm.model.inference_method = "qpbo"
             Y_pred = ssvm.predict(data.X)
 
@@ -102,8 +107,8 @@ def main():
                 print("superpixel accuracy: %.2f"
                       % (np.mean((np.hstack(Y_pred) == Y_flat)[Y_flat != 255])
                          * 100))
-                hamming, jaccard = pascal_helpers.eval_on_sp(
-                    data, Y_pred, print_results=False)
+                hamming, jaccard = eval_on_sp(ds, data, Y_pred,
+                                              print_results=False)
                 print("Jaccard: %.2f, Hamming: %.2f" % (jaccard.mean(),
                                                         hamming.mean()))
 

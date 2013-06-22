@@ -1,11 +1,10 @@
 from collections import namedtuple
-import os
-from glob import glob
+#from glob import glob
 
 import cPickle
 
 import numpy as np
-from scipy.misc import imread
+#from scipy.misc import imread
 from scipy import sparse
 import matplotlib.pyplot as plt
 
@@ -14,8 +13,10 @@ from sklearn.externals.joblib import Memory
 from sklearn.kernel_approximation import AdditiveChi2Sampler
 
 
-from datasets.msrc import MSRCDataset, colors, classes
-from latent_crf_experiments.utils import (add_edges, get_edge_contrast,
+from datasets.msrc import MSRC21Dataset
+#from latent_crf_experiments.utils import (add_edges, get_edge_contrast,
+                                          #get_edge_directions)
+from latent_crf_experiments.utils import (get_edge_contrast,
                                           get_edge_directions)
 
 # stores information that was COMPUTED from the dataset + file names for
@@ -85,84 +86,39 @@ def load_data(dataset="train", which="bow"):
     return data
 
 
-def load_data_aurelien(dataset="train", independent=False):
-    mountain_idx = np.where(classes == "mountain")[0]
-    horse_idx = np.where(classes == "horse")[0]
-    void_idx = np.where(classes == "void")[0]
+#def load_data_aurelien(dataset="train", independent=False):
+    #mountain_idx = np.where(classes == "mountain")[0]
+    #horse_idx = np.where(classes == "horse")[0]
+    #void_idx = np.where(classes == "void")[0]
 
-    ds_dict = dict(train="Train", val="Validation", test="Test")
-    if dataset not in ds_dict.keys():
-        raise ValueError("dataset must be one of 'train', 'val', 'test',"
-                         " got %s" % dataset)
-    ds_path = base_path + ds_dict[dataset]
-    file_names, all_superpixels = [], []
-    X, Y = [], []
-    for f in glob(ds_path + "/*.dat"):
-        name = os.path.basename(f).split('.')[0]
-        img = imread("%s/%s.bmp" % (ds_path, name))
-        labels = np.loadtxt(base_path + "labels/%s.txt" % name, dtype=np.int)
-        file_names.append(name)
-        # features
-        feat = np.hstack([np.loadtxt("%s/%s.local%s" % (ds_path, name, i)) for
-                          i in xrange(1, 7)])
-        # superpixels
-        superpixels = np.fromfile("%s/%s.dat" % (ds_path, name),
-                                  dtype=np.int32)
-        superpixels = superpixels.reshape(img.shape[:-1][::-1]).T - 1
-        all_superpixels.append(superpixels)
-        # make horse and mountain to void
-        labels[labels == mountain_idx] = void_idx
-        labels[labels == horse_idx] = void_idx
-        Y.append(labels)
-        X.append(feat)
-    data = DataBunch(X, Y, file_names, all_superpixels)
-    data = add_edges(data, independent=independent)
-    return data
-
-
-def plot_results(data, Y_pred, folder="figures", use_colors_predict=True):
-    if not os.path.exists(folder):
-        os.mkdir(folder)
-    msrc = MSRCDataset()
-    import matplotlib.colors as cl
-    np.random.seed(0)
-    random_colormap = cl.ListedColormap(np.random.uniform(size=(100, 3)))
-    for image_name, superpixels, y, y_pred in zip(data.file_names,
-                                                  data.superpixels, data.Y,
-                                                  Y_pred):
-        image = msrc.get_image(image_name)
-        fig, axes = plt.subplots(2, 3, figsize=(12, 6))
-        axes[0, 0].imshow(image)
-        axes[0, 1].set_title("ground truth")
-        axes[0, 1].imshow(image)
-        gt = msrc.get_ground_truth(image_name)
-        axes[0, 1].imshow(colors[gt], alpha=.7)
-        axes[1, 0].set_title("sp ground truth")
-        axes[1, 0].imshow(image)
-        axes[1, 0].imshow(colors[y[superpixels]], vmin=0, vmax=23, alpha=.7)
-
-        axes[1, 1].set_title("prediction")
-        axes[1, 1].imshow(image)
-        if use_colors_predict:
-            axes[1, 1].imshow(colors[y_pred[superpixels]], alpha=.7)
-        else:
-            vmax = np.max(np.hstack(Y_pred))
-            axes[1, 1].imshow(y_pred[superpixels], vmin=0, vmax=vmax, alpha=.9,
-                              cmap=random_colormap)
-        if use_colors_predict:
-            present_y = np.unique(np.hstack([y, y_pred]))
-        else:
-            present_y = np.unique(y)
-        axes[0, 2].imshow(colors[present_y, :][:, np.newaxis, :],
-                          interpolation='nearest')
-        for i, c in enumerate(present_y):
-            axes[0, 2].text(1, i, classes[c])
-        for ax in axes.ravel():
-            ax.set_xticks(())
-            ax.set_yticks(())
-        axes[1, 2].set_visible(False)
-        fig.savefig(folder + "/%s.png" % image_name, bbox_inches="tight")
-        plt.close(fig)
+    #ds_dict = dict(train="Train", val="Validation", test="Test")
+    #if dataset not in ds_dict.keys():
+        #raise ValueError("dataset must be one of 'train', 'val', 'test',"
+                         #" got %s" % dataset)
+    #ds_path = base_path + ds_dict[dataset]
+    #file_names, all_superpixels = [], []
+    #X, Y = [], []
+    #for f in glob(ds_path + "/*.dat"):
+        #name = os.path.basename(f).split('.')[0]
+        #img = imread("%s/%s.bmp" % (ds_path, name))
+        #labels = np.loadtxt(base_path + "labels/%s.txt" % name, dtype=np.int)
+        #file_names.append(name)
+        ## features
+        #feat = np.hstack([np.loadtxt("%s/%s.local%s" % (ds_path, name, i)) for
+                          #i in xrange(1, 7)])
+        ## superpixels
+        #superpixels = np.fromfile("%s/%s.dat" % (ds_path, name),
+                                  #dtype=np.int32)
+        #superpixels = superpixels.reshape(img.shape[:-1][::-1]).T - 1
+        #all_superpixels.append(superpixels)
+        ## make horse and mountain to void
+        #labels[labels == mountain_idx] = void_idx
+        #labels[labels == horse_idx] = void_idx
+        #Y.append(labels)
+        #X.append(feat)
+    #data = DataBunch(X, Y, file_names, all_superpixels)
+    #data = add_edges(data, independent=independent)
+    #return data
 
 
 def concatenate_datasets(data1, data2):
@@ -270,7 +226,7 @@ def eval_on_pixels(data, sp_predictions, print_results=True):
         Whether to print results to stdout.
 
     """
-    msrc = MSRCDataset()
+    msrc = MSRC21Dataset()
     pixel_predictions = [sp_pred[sp] for sp_pred, sp in zip(sp_predictions,
                                                             data.superpixels)]
     result = msrc.eval_pixel_performance(data.file_names, pixel_predictions,
@@ -280,7 +236,7 @@ def eval_on_pixels(data, sp_predictions, print_results=True):
 
 def add_edge_features(data):
     X = []
-    msrc = MSRCDataset()
+    msrc = MSRC21Dataset()
     for x, superpixels, file_name in zip(data.X, data.superpixels,
                                          data.file_names):
         features = [np.ones((x[1].shape[0], 1))]
@@ -291,13 +247,13 @@ def add_edge_features(data):
     return DataBunch(X, data.Y, data.file_names, data.superpixels)
 
 
-def plot_confusion_matrix(confusion, title=None):
+def plot_confusion_matrix(dataset, confusion, title=None):
     confusion_normalized = (confusion.astype(np.float) /
                             confusion.sum(axis=1)[:, np.newaxis])
     plt.matshow(confusion_normalized)
     plt.axis("off")
     plt.colorbar()
-    for i, c in enumerate(classes[:-2]):
+    for i, c in enumerate(dataset.classes):
         plt.text(i, -1, c, rotation=60, va='bottom')
         plt.text(-1, i, c, ha='right')
     if title:
