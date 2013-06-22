@@ -13,7 +13,7 @@ from pystruct.utils import make_grid_edges
 
 DataBunch = namedtuple('DataBunch', 'X, Y, file_names, superpixels')
 
-memory = Memory(cachedir="/tmp/cache")
+memory = Memory(cachedir="/tmp/cache", verbose=1)
 
 
 @memory.cache
@@ -75,19 +75,22 @@ def discard_void(dataset, data, latent_features=False):
 
 
 @memory.cache
-def add_edges(data, independent=False, fully_connected=False):
+def add_edges(data, kind="pairwise"):
     # generate graph
-    if independent:
+    if kind == "independent":
         X_new = [(x, np.empty((0, 2), dtype=np.int)) for x in data.X]
+
+    elif kind == "fully_connected":
+        X_new = [(x, np.vstack([e for e in
+                                itertools.combinations(np.arange(len(x)), 2)]))
+                 for x in data.X]
+    elif kind == "pairwise":
+        X_new = [(x, region_graph(sp))
+                 for x, sp in zip(data.X, data.superpixels)]
     else:
-        if fully_connected:
-            X_new = [(x, np.vstack([e for e in
-                                    itertools.combinations(np.arange(len(x)),
-                                                           2)]))
-                     for x in data.X]
-        else:
-            X_new = [(x, region_graph(sp))
-                     for x, sp in zip(data.X, data.superpixels)]
+        raise ValueError("Parameter 'kind' should be one of 'independent'"
+                         ",'fully_connected' or 'pairwise', got %s"
+                         % kind)
 
     return DataBunch(X_new, data.Y, data.file_names, data.superpixels)
 
