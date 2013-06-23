@@ -2,8 +2,8 @@ from collections import namedtuple
 import numpy as np
 from scipy import sparse
 
-#from sklearn.cluster import Ward
-from sklearn.cluster import KMeans
+from sklearn.cluster import Ward
+#from sklearn.cluster import KMeans
 from sklearn.externals.joblib import Memory
 
 
@@ -52,11 +52,14 @@ def get_km_segments(x, image, sps, n_segments=25):
         feats, edges, _ = x
     colors_ = get_colors(image, sps)
     centers = get_centers(sps)
-    #graph = sparse.coo_matrix((np.ones(edges.shape[0]), edges.T))
-    #ward = Ward(n_clusters=25, connectivity=graph)
-    km = KMeans(n_clusters=n_segments)
-    color_feats = np.hstack([colors_, centers * 2])
-    return km.fit_predict(color_feats)
+    n_spixel = len(feats)
+    graph = sparse.coo_matrix((np.ones(edges.shape[0]), edges.T),
+                              shape=(n_spixel, n_spixel))
+    ward = Ward(n_clusters=n_segments, connectivity=graph + graph.T)
+    #km = KMeans(n_clusters=n_segments)
+    color_feats = np.hstack([colors_, centers * .5])
+    #return km.fit_predict(color_feats)
+    return ward.fit_predict(color_feats)
 
 
 @memory.cache
