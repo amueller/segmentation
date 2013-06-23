@@ -161,13 +161,14 @@ def plot_results(dataset, data, Y_pred, folder="figures",
         axes[0, 1].imshow(gt, alpha=.7, cmap=dataset.cmap)
         axes[1, 0].set_title("sp ground truth")
         axes[1, 0].imshow(image)
-        axes[1, 0].imshow(y[superpixels], vmin=0, vmax=23, alpha=.7,
-                          cmap=dataset.cmap)
+        axes[1, 0].imshow(y[superpixels], vmin=0, vmax=dataset.cmap.N,
+                          alpha=.7, cmap=dataset.cmap)
 
         axes[1, 1].set_title("prediction")
         axes[1, 1].imshow(image)
         if use_colors_predict:
-            axes[1, 1].imshow(y_pred[superpixels], alpha=.7, cmap=dataset.cmap)
+            axes[1, 1].imshow(y_pred[superpixels], alpha=.7, vmin=0,
+                              vmax=dataset.cmap.N, cmap=dataset.cmap)
         else:
             vmax = np.max(np.hstack(Y_pred))
             axes[1, 1].imshow(y_pred[superpixels], vmin=0, vmax=vmax, alpha=.9,
@@ -177,8 +178,8 @@ def plot_results(dataset, data, Y_pred, folder="figures",
         else:
             present_y = np.unique(y)
         present_y = present_y[present_y != dataset.void_label]
-        axes[0, 2].imshow(present_y[np.newaxis, :], interpolation='nearest',
-                          cmap=dataset.cmap, vmin=0)
+        axes[0, 2].imshow(present_y[:, np.newaxis], interpolation='nearest',
+                          cmap=dataset.cmap, vmin=0, vmax=dataset.cmap.N)
         for i, c in enumerate(present_y):
             axes[0, 2].text(1, i, dataset.classes[c])
         for ax in axes.ravel():

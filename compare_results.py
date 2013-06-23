@@ -5,7 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from pystruct.utils import SaveLogger
-from datasets import PascalSegmentation
+from datasets.pascal import PascalSegmentation
 
 from pascal.pascal_helpers import load_pascal
 from utils import add_edges, add_edge_features, eval_on_pixels
@@ -24,9 +24,9 @@ def main():
     data = load_pascal(data_str)
     dataset = PascalSegmentation()
     print("done")
-    data1 = add_edges(data, independent=False)
-    data2 = add_edges(data, independent=True)
-    data1 = add_edge_features(data1)
+    data1 = add_edges(data, kind="pairwise")
+    data2 = add_edges(data, kind="pairwise")
+    data1 = add_edge_features(dataset, data1)
     #data2 = add_edge_features(data2)
     Y_pred1 = ssvm1.predict(data1.X)
     Y_pred2 = ssvm2.predict(data2.X)
@@ -50,24 +50,26 @@ def main():
         axes[0, 1].set_title("ground truth")
         axes[0, 1].imshow(image)
         gt = dataset.get_ground_truth(image_name)
-        axes[0, 1].imshow(gt, alpha=.7, cmap=dataset.cmap)
-        perf = eval_on_pixels([gt], [y_pred1[superpixels]],
+        axes[0, 1].imshow(gt, alpha=.7, cmap=dataset.cmap, vmin=0,
+                          vmax=dataset.cmap.N)
+        perf = eval_on_pixels(dataset, [gt], [y_pred1[superpixels]],
                               print_results=False)[0]
         perf = np.mean(perf[np.isfinite(perf)])
         axes[1, 0].set_title("%.2f" % perf)
         axes[1, 0].imshow(image)
-        axes[1, 0].imshow(y_pred1[superpixels], vmin=0, alpha=.7,
-                          cmap=dataset.cmap)
+        axes[1, 0].imshow(y_pred1[superpixels], vmin=0, vmax=dataset.cmap.N,
+                          alpha=.7, cmap=dataset.cmap)
 
-        perf = eval_on_pixels([gt], [y_pred2[superpixels]],
+        perf = eval_on_pixels(dataset, [gt], [y_pred2[superpixels]],
                               print_results=False)[0]
         perf = np.mean(perf[np.isfinite(perf)])
         axes[1, 1].set_title("%.2f" % perf)
         axes[1, 1].imshow(image)
-        axes[1, 1].imshow(y_pred2[superpixels], alpha=.7, cmap=dataset.cmap)
+        axes[1, 1].imshow(y_pred2[superpixels], alpha=.7, cmap=dataset.cmap,
+                          vmin=0, vmax=dataset.cmap.N)
         present_y = np.unique(np.hstack([y_pred1, y_pred2]))
-        axes[0, 2].imshow(present_y[np.newaxis, :], interpolation='nearest',
-                          cmap=dataset.cmap)
+        axes[0, 2].imshow(present_y[:, np.newaxis], interpolation='nearest',
+                          cmap=dataset.cmap, vmin=0, vmax=dataset.cmap.N)
         for i, c in enumerate(present_y):
             axes[0, 2].text(1, i, dataset.classes[c])
         for ax in axes.ravel():
