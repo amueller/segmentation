@@ -69,7 +69,8 @@ def load_pascal(which='train', year="2010"):
         image = pascal.get_image(f)
         superpixels.append(slic_n(image, n_superpixels=100, compactness=10))
         X.append(get_kraehenbuehl_pot_sp(f, superpixels[-1]))
-        Y.append(gt_in_sp(pascal, f, superpixels[-1]))
+        if which != "test":
+            Y.append(gt_in_sp(pascal, f, superpixels[-1]))
 
     return DataBunch(X, Y, files, superpixels)
 

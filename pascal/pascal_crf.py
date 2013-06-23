@@ -4,11 +4,10 @@ from pystruct import learners
 import pystruct.models as crfs
 from pystruct.utils import SaveLogger
 
-from pascal_helpers import load_pascal, eval_on_sp, add_edge_features
-from latent_crf_experiments.utils import discard_void, add_edges
-
-#from hierarchical_helpers import load_data_global_probs
-#from msrc_helpers import SimpleSplitCV, concatenate_datasets
+from datasets.pascal import PascalSegmentation
+from pascal_helpers import load_pascal
+from latent_crf_experiments.utils import (discard_void, add_edges, eval_on_sp,
+                                          add_edge_features)
 
 
 from IPython.core.debugger import Tracer
@@ -16,21 +15,23 @@ tracer = Tracer()
 
 
 def main(C=1, test=False):
+    ds = PascalSegmentation()
     # load training data
     independent = False
-    data_train = load_pascal("train1")
+    #independent = True
     if test:
-        data_train = load_pascal("train")
+        data_train = load_pascal("kVal")
     else:
-        data_train = load_pascal("train1")
+        data_train = load_pascal("kTrain")
 
-    data_train = add_edges(data_train, independent=independent)
-    data_train = discard_void(data_train, 255)
+    data_train = add_edges(data_train, 'independent' if independent else
+                           "pairwise")
+    data_train = discard_void(ds, data_train, ds.void_label)
 
     #data_train = load_data_global_probs()
 
     if not independent:
-        data_train = add_edge_features(data_train)
+        data_train = add_edge_features(ds, data_train)
 
     n_states = 21
     print("number of samples: %s" % len(data_train.X))
@@ -53,7 +54,7 @@ def main(C=1, test=False):
                                      n_edge_features=3,
                                      symmetric_edge_features=[0, 1],
                                      antisymmetric_edge_features=[2])
-    experiment_name = "edge_features_%f" % C
+    experiment_name = "edge_features_ksplit_trainval_%f" % C
     #warm_start = True
     warm_start = False
     ssvm = learners.OneSlackSSVM(
@@ -83,7 +84,7 @@ def main(C=1, test=False):
 
     print("fit finished!")
     if test:
-        data_val = load_pascal('val')
+        data_val = load_pascal('kTest')
     else:
         data_val = load_pascal('train2')
     data_val = add_edges(data_val, independent=independent)
@@ -93,4 +94,4 @@ def main(C=1, test=False):
 if __name__ == "__main__":
     #for C in 10. ** np.arange(-4, 2):
         #main(C)
-    main(.1, test=False)
+    main(1, test=True)
