@@ -90,7 +90,7 @@ def get_segment_features(x, y, image, sps):
 
 @memory.cache
 def make_hierarchical_data(dataset, data, lateral=False, latent=False,
-                           latent_lateral=False):
+                           latent_lateral=False, add_edge_features=False):
     images = [dataset.get_image(f) for f in data.file_names]
     segment_features = [get_segment_features(*stuff)
                         for stuff in zip(data.X, data.Y,
@@ -126,7 +126,20 @@ def make_hierarchical_data(dataset, data, lateral=False, latent=False,
                                          edges_latent_lateral[:, 1]]
                 edges_stacked = np.vstack([edges_stacked,
                                            edges_latent_lateral])
-            x_stacked = (x[0], edges_stacked, len(feat))
+            if add_edge_features:
+                edge_features = x[2]
+                # we assume that thie fist edge feature is symmetric, I guess..
+                n_edge_features = x[2].shape[1]
+                edge_features_new = np.zeros(n_edge_features)
+                edge_features_new[0] = 1
+                edge_features_new = np.repeat(edge_features_new[np.newaxis, :],
+                                              len(edges), axis=0)
+                edge_features_stacked = np.vstack([edge_features,
+                                                   edge_features_new])
+                x_stacked = (x[0], edges_stacked, edge_features_stacked,
+                             len(feat))
+            else:
+                x_stacked = (x[0], edges_stacked, len(feat))
         else:
             if latent_lateral:
                 raise ValueError("wut?")

@@ -37,6 +37,10 @@ def discard_void(dataset, data, latent_features=False):
             else:
                 features, edges, edge_features = x
                 edge_features_new = edge_features
+        elif len(x) == 4:
+                features, edges, edge_features, n_hidden = x
+                edge_features_new = edge_features
+                mask = np.hstack([mask, np.ones(n_hidden, dtype=np.bool)])
         else:
             raise ValueError("len(x) is weird: %d" % len(data.X[0]))
 
@@ -47,7 +51,8 @@ def discard_void(dataset, data, latent_features=False):
             for void_node in voids:
                 involves_void_node = np.any(edges_new == void_node, axis=1)
                 edges_new = edges_new[~involves_void_node]
-                if len(x) == 3 and not isinstance(x[2], numbers.Integral):
+                if (len(x) == 3 and not isinstance(x[2], numbers.Integral) or
+                        len(x) == 4):
                     edge_features_new = edge_features_new[~involves_void_node]
 
         reindex_edges = np.zeros(len(mask), dtype=np.int)
@@ -56,7 +61,7 @@ def discard_void(dataset, data, latent_features=False):
         if len(x) == 2:
             X_new.append((features[mask], edges_new))
             Y_new.append(y[mask])
-        else:
+        elif len(x) == 3:
             if isinstance(x[2], numbers.Integral):
                 n_hidden_new = np.max(edges_new) - np.sum(mask[:-n_hidden]) + 1
                 if latent_features:
@@ -70,7 +75,13 @@ def discard_void(dataset, data, latent_features=False):
             else:
                 X_new.append((features[mask], edges_new, edge_features_new))
                 Y_new.append(y[mask])
-
+        else:
+            n_hidden_new = np.max(edges_new) - np.sum(mask[:-n_hidden]) + 1
+            X_new.append((features[mask[:-n_hidden]], edges_new,
+                          edge_features_new, n_hidden_new))
+            Y_new.append(y[mask[:-n_hidden]])
+    from IPython.core.debugger import Tracer
+    Tracer()()
     return DataBunch(X_new, Y_new, data.file_names, data.superpixels)
 
 

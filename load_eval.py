@@ -70,9 +70,9 @@ def main():
                 data = msrc_helpers.load_data(data_str, which="piecewise")
             elif dataset == 'pascal':
                 ds = PascalSegmentation()
-                data = pascal_helpers.load_pascal("kTrainVal" if data_str ==
-                                                  'train' else "kTest")
-                #data = pascal_helpers.load_pascal(data_str)
+                #data = pascal_helpers.load_pascal("kTrainVal" if data_str ==
+                                                  #'train' else "kTest")
+                data = pascal_helpers.load_pascal(data_str)
             data = add_edges(data, "independent" if independent else
                              "pairwise")
             #data = add_kraehenbuehl_features(data, which="train_30px")
@@ -82,10 +82,15 @@ def main():
             if type(ssvm.model).__name__ == 'EdgeFeatureGraphCRF':
                 data = add_edge_features(ds, data)
 
-            if isinstance(ssvm.model, LatentNodeCRF):
-                data = make_hierarchical_data(ds, data, lateral=True,
-                                              latent=True,
-                                              latent_lateral=False)
+            if type(ssvm.model).__name__ == "LatentNodeCRF":
+                data = make_hierarchical_data(
+                    ds, data, lateral=True, latent=True, latent_lateral=False,
+                    add_edge_features=False)
+            if type(ssvm.model).__name__ == "EdgeFeatureLatentNodeCRF":
+                data = add_edge_features(ds, data)
+                data = make_hierarchical_data(
+                    ds, data, lateral=True, latent=True, latent_lateral=False,
+                    add_edge_features=True)
             ssvm.model.inference_method = "qpbo"
             Y_pred = ssvm.predict(data.X)
 

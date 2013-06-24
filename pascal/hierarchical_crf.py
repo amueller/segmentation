@@ -40,19 +40,20 @@ def svm_on_segments(C=.1, learning_rate=.001, subgradient=False):
     n_states = 21
     class_weights = 1. / np.bincount(np.hstack(Y_))
     class_weights *= 21. / np.sum(class_weights)
-    experiment_name = ("latent_20_features_C%f" % C)
+    experiment_name = ("latent_5_subgradient_C%f_lr%f_exp.5" % (C,
+                                                                learning_rate))
     logger = SaveLogger(experiment_name + ".pickle", save_every=10)
     if latent:
         model = LatentNodeCRF(n_labels=n_states,
                               n_features=data_train.X[0][0].shape[1],
-                              n_hidden_states=5, inference_method='qpbo' if
+                              n_hidden_states=40, inference_method='qpbo' if
                               lateral else 'dai', class_weight=class_weights,
                               latent_node_features=False)
         if subgradient:
             ssvm = learners.LatentSubgradientSSVM(
                 model, C=C, verbose=1, show_loss_every=10, logger=logger,
-                n_jobs=-1, learning_rate=learning_rate, decay_exponent=1,
-                momentum=0., max_iter=100000)
+                n_jobs=-1, learning_rate=learning_rate, decay_exponent=.5,
+                momentum=0., max_iter=100000, decay_t0=100)
         else:
             latent_logger = SaveLogger("lssvm_" + experiment_name +
                                        "_%d.pickle", save_every=1)
@@ -60,7 +61,7 @@ def svm_on_segments(C=.1, learning_rate=.001, subgradient=False):
                 model, verbose=2, C=C, max_iter=100000, n_jobs=-1, tol=0.001,
                 show_loss_every=200, inference_cache=50, logger=logger,
                 cache_tol='auto', inactive_threshold=1e-5, break_on_bad=False,
-                switch_to_ad3=True)
+                switch_to_ad3=False)
             ssvm = learners.LatentSSVM(base_ssvm, logger=latent_logger)
         warm_start = False
         if warm_start:
@@ -120,6 +121,6 @@ if __name__ == "__main__":
     #for lr in 10. ** np.arange(-3, 2)[::-1]:
         #svm_on_segments(C=.01, learning_rate=lr)
     #svm_on_segments(C=.01, learning_rate=0.1)
-    svm_on_segments(C=.01, subgradient=False)
+    svm_on_segments(C=.01, subgradient=True, learning_rate=.1)
     #plot_init()
     #plot_results()
