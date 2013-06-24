@@ -70,9 +70,9 @@ def main():
                 data = msrc_helpers.load_data(data_str, which="piecewise")
             elif dataset == 'pascal':
                 ds = PascalSegmentation()
-                #data = pascal_helpers.load_pascal("train1" if data_str ==
-                                                  #'train' else "train2")
-                data = pascal_helpers.load_pascal(data_str)
+                data = pascal_helpers.load_pascal("kTrainVal" if data_str ==
+                                                  'train' else "kTest")
+                #data = pascal_helpers.load_pascal(data_str)
             data = add_edges(data, "independent" if independent else
                              "pairwise")
             #data = add_kraehenbuehl_features(data, which="train_30px")
