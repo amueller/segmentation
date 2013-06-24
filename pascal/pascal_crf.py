@@ -20,7 +20,7 @@ def main(C=1, test=False):
     independent = False
     #independent = True
     if test:
-        data_train = load_pascal("kVal")
+        data_train = load_pascal("trainval")
     else:
         data_train = load_pascal("kTrain")
 
@@ -84,9 +84,9 @@ def main(C=1, test=False):
 
     print("fit finished!")
     if test:
-        data_val = load_pascal('kTest')
+        data_val = load_pascal('val')
     else:
-        data_val = load_pascal('train2')
+        data_val = load_pascal('kVal')
     data_val = add_edges(data_val, 'independent' if independent else
                          "pairwise")
     data_val = add_edge_features(data_val)
