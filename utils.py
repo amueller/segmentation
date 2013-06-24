@@ -80,8 +80,6 @@ def discard_void(dataset, data, latent_features=False):
             X_new.append((features[mask[:-n_hidden]], edges_new,
                           edge_features_new, n_hidden_new))
             Y_new.append(y[mask[:-n_hidden]])
-    from IPython.core.debugger import Tracer
-    Tracer()()
     return DataBunch(X_new, Y_new, data.file_names, data.superpixels)
 
 

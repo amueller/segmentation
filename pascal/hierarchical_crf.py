@@ -3,15 +3,15 @@ import numpy as np
 from sklearn.utils import shuffle
 #from sklearn.grid_search import GridSearchCV
 
-from pystruct.models import EdgeFeatureGraphCRF, LatentNodeCRF
+from pystruct import models
 from pystruct import learners
 from pystruct.utils import SaveLogger
 #from pystruct.models.latent_node_crf import kmeans_init
 
 from datasets.pascal import PascalSegmentation
 from pascal_helpers import load_pascal
-from latent_crf_experiments.utils import discard_void, add_edges
-                                          #add_edge_features)
+from latent_crf_experiments.utils import (discard_void, add_edges,
+                                          add_edge_features)
 from latent_crf_experiments.hierarchical_segmentation import \
     make_hierarchical_data
 
@@ -24,13 +24,14 @@ def svm_on_segments(C=.1, learning_rate=.001, subgradient=False):
     # load and prepare data
     lateral = True
     latent = True
-    data_train = load_pascal("train1")
+    data_train = load_pascal("kVal")
     data_train = add_edges(data_train)
-    #if lateral:
-        #data_train = add_edge_features(ds, data_train)
+    if lateral:
+        data_train = add_edge_features(ds, data_train)
     X_org_ = data_train.X
     data_train = make_hierarchical_data(ds, data_train, lateral=lateral,
-                                        latent=latent, latent_lateral=False)
+                                        latent=latent, latent_lateral=False,
+                                        add_edge_features=True)
     data_train = discard_void(ds, data_train)
     X_, Y_ = data_train.X, data_train.Y
     # remove edges
@@ -40,19 +41,25 @@ def svm_on_segments(C=.1, learning_rate=.001, subgradient=False):
     n_states = 21
     class_weights = 1. / np.bincount(np.hstack(Y_))
     class_weights *= 21. / np.sum(class_weights)
-    experiment_name = ("latent_5_subgradient_C%f_lr%f_exp.5" % (C,
-                                                                learning_rate))
+    experiment_name = ("latent_25_subgradient_edge_features_C%f_lr%f_kval" %
+                       (C, learning_rate))
     logger = SaveLogger(experiment_name + ".pickle", save_every=10)
     if latent:
-        model = LatentNodeCRF(n_labels=n_states,
-                              n_features=data_train.X[0][0].shape[1],
-                              n_hidden_states=40, inference_method='qpbo' if
-                              lateral else 'dai', class_weight=class_weights,
-                              latent_node_features=False)
+        #model = LatentNodeCRF(n_labels=n_states,
+                              #n_features=data_train.X[0][0].shape[1],
+                              #n_hidden_states=40, inference_method='qpbo' if
+                              #lateral else 'dai', class_weight=class_weights,
+                              #latent_node_features=False)
+        model = models.EdgeFeatureLatentNodeCRF(
+            n_labels=n_states, n_features=data_train.X[0][0].shape[1],
+            n_hidden_states=25, inference_method='qpbo' if lateral else 'dai',
+            class_weight=class_weights, latent_node_features=False,
+            n_edge_features=3, symmetric_edge_features=[0, 1],
+            antisymmetric_edge_features=[2])
         if subgradient:
             ssvm = learners.LatentSubgradientSSVM(
                 model, C=C, verbose=1, show_loss_every=10, logger=logger,
-                n_jobs=-1, learning_rate=learning_rate, decay_exponent=.5,
+                n_jobs=-1, learning_rate=learning_rate, decay_exponent=1,
                 momentum=0., max_iter=100000, decay_t0=100)
         else:
             latent_logger = SaveLogger("lssvm_" + experiment_name +
@@ -63,26 +70,27 @@ def svm_on_segments(C=.1, learning_rate=.001, subgradient=False):
                 cache_tol='auto', inactive_threshold=1e-5, break_on_bad=False,
                 switch_to_ad3=False)
             ssvm = learners.LatentSSVM(base_ssvm, logger=latent_logger)
+        #warm_start = True
         warm_start = False
         if warm_start:
             ssvm = logger.load()
             ssvm.logger = SaveLogger(experiment_name + "_retrain.pickle",
                                      save_every=10)
-            ssvm.max_iter = 100000
-            ssvm.learning_rate = 0.00001
-            ssvm.momentum = 0
+            ssvm.max_iter = 10000
+            ssvm.decay_exponent = 1
+            #ssvm.decay_t0 = 1000
+            #ssvm.learning_rate = 0.00001
+            #ssvm.momentum = 0
     else:
         #model = GraphCRF(n_states=n_states,
                          #n_features=data_train.X[0][0].shape[1],
                          #inference_method='qpbo' if lateral else 'dai',
                          #class_weight=class_weights)
-        model = EdgeFeatureGraphCRF(n_states=n_states,
-                                    n_features=data_train.X[0][0].shape[1],
-                                    inference_method='qpbo' if lateral else
-                                    'dai', class_weight=class_weights,
-                                    n_edge_features=4,
-                                    symmetric_edge_features=[0, 1],
-                                    antisymmetric_edge_features=[2])
+        model = models.EdgeFeatureGraphCRF(
+            n_states=n_states, n_features=data_train.X[0][0].shape[1],
+            inference_method='qpbo' if lateral else 'dai',
+            class_weight=class_weights, n_edge_features=3,
+            symmetric_edge_features=[0, 1], antisymmetric_edge_features=[2])
         ssvm = learners.OneSlackSSVM(
             model, verbose=2, C=C, max_iter=100000, n_jobs=-1,
             tol=0.0001, show_loss_every=200, inference_cache=50, logger=logger,
@@ -92,7 +100,7 @@ def svm_on_segments(C=.1, learning_rate=.001, subgradient=False):
 
     X_, Y_ = shuffle(X_, Y_)
     #ssvm.fit(data_train.X, data_train.Y)
-    ssvm.fit(X_, Y_)
+    ssvm.fit(X_, Y_, warm_start=warm_start)
     #H_init = [np.hstack([y, np.random.randint(21, 26)]) for y in Y_]
     #ssvm.fit(X_, Y_, H_init=H_init)
     print("fit finished!")
@@ -121,6 +129,6 @@ if __name__ == "__main__":
     #for lr in 10. ** np.arange(-3, 2)[::-1]:
         #svm_on_segments(C=.01, learning_rate=lr)
     #svm_on_segments(C=.01, learning_rate=0.1)
-    svm_on_segments(C=.01, subgradient=True, learning_rate=.1)
+    svm_on_segments(C=.01, subgradient=True, learning_rate=1)
     #plot_init()
     #plot_results()
