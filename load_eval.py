@@ -50,6 +50,7 @@ def main():
     if argv[2] == 'acc':
 
         ssvm.n_jobs = -1
+
         #for data_str, title in zip(["train", "val", "test"],
                                    #["TRAINING SET", "VALIDATION SET",
                                     #"TEST SET"]):
@@ -67,20 +68,31 @@ def main():
             #data = load_data_global_probs(data_str, latent=True)
             if dataset == 'msrc':
                 ds = MSRC21Dataset()
-                data = msrc_helpers.load_data(data_str, which="piecewise")
+                data = msrc_helpers.load_data(data_str,
+                                              which="piecewise_new")
+                #data = add_kraehenbuehl_features(data, which="train_30px")
+                data = msrc_helpers.add_kraehenbuehl_features(data,
+                                                              which="train")
             elif dataset == 'pascal':
                 ds = PascalSegmentation()
                 #data = pascal_helpers.load_pascal("kTrainVal" if data_str ==
                                                   #'train' else "kTest")
                 data = pascal_helpers.load_pascal(data_str)
+            else:
+                raise ValueError("Excepted dataset to be 'pascal' or 'msrc',"
+                                 " got %s." % dataset)
             data = add_edges(data, "independent" if independent else
                              "pairwise")
-            #data = add_kraehenbuehl_features(data, which="train_30px")
-            #data = add_kraehenbuehl_features(data, which="train")
             # may Guido have mercy on my soul
             #(I renamed the module after pickling)
             if type(ssvm.model).__name__ == 'EdgeFeatureGraphCRF':
                 data = add_edge_features(ds, data)
+            if type(ssvm.model).__name__ == "LatentNodeCRF":
+                # hack for old pickles
+                if not hasattr(ssvm.model, 'n_input_states'):
+                    ssvm.model.n_input_states = ssvm.model.n_labels
+                if not hasattr(ssvm.model, 'latent_node_features'):
+                    ssvm.model.latent_node_features = False
 
             if type(ssvm.model).__name__ == "LatentNodeCRF":
                 data = make_hierarchical_data(
@@ -106,7 +118,7 @@ def main():
                                                   print_results=True)
                 print("global: %.2f, average: %.2f" % (res['global'] * 100,
                                                        res['average'] * 100))
-                msrc_helpers.plot_confusion_matrix(res['confusion'])
+                #msrc_helpers.plot_confusion_matrix(res['confusion'])
             elif dataset == 'pascal':
                 print("superpixel accuracy: %.2f"
                       % (np.mean((np.hstack(Y_pred) == Y_flat)[Y_flat != 255])
