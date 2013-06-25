@@ -2,7 +2,6 @@ from collections import namedtuple
 
 import numpy as np
 from scipy import sparse
-from matplotlib.colors import ListedColormap
 
 from sklearn.externals.joblib import Memory
 from slic_python import slic_n
@@ -14,8 +13,6 @@ from latent_crf_experiments.utils import gt_in_sp
 memory = Memory(cachedir="/tmp/cache")
 pascal_path = "/home/local/datasets/VOC2011/TrainVal/VOCdevkit/VOC2011"
 
-colors = np.loadtxt("pascal_colors.txt")
-cmap = ListedColormap(colors)
 
 # stores information that was COMPUTED from the dataset + file names for
 # correspondence

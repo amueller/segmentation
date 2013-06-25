@@ -22,7 +22,7 @@ def main(C=1, test=False):
     if test:
         data_train = load_pascal("trainval")
     else:
-        data_train = load_pascal("kTrain")
+        data_train = load_pascal("kVal")
 
     data_train = add_edges(data_train, 'independent' if independent else
                            "pairwise")
@@ -51,10 +51,10 @@ def main(C=1, test=False):
                                      n_features=data_train.X[0][0].shape[1],
                                      inference_method='qpbo',
                                      class_weight=class_weights,
-                                     n_edge_features=3,
-                                     symmetric_edge_features=[0, 1],
-                                     antisymmetric_edge_features=[2])
-    experiment_name = "edge_features_ksplit_trainval_%f" % C
+                                     n_edge_features=6,
+                                     symmetric_edge_features=[0, 1, 2, 3, 4],
+                                     antisymmetric_edge_features=[5])
+    experiment_name = "edge_features_more_colors_kval%f" % C
     #warm_start = True
     warm_start = False
     ssvm = learners.OneSlackSSVM(
@@ -74,25 +74,25 @@ def main(C=1, test=False):
             file_name=experiment_name + "_refit.pickle",
             save_every=10)
         #ssvm.learning_rate = 0.000001
-        ssvm.cache_tol = 0.1
-        ssvm.cache_tol_ = 0.1
+        #ssvm.cache_tol = 0.1
+        #ssvm.cache_tol_ = 0.1
 
-        #ssvm.model.inference_method = 'ad3'
+        ssvm.model.inference_method = 'ad3'
         #ssvm.n_jobs = 1
 
     ssvm.fit(data_train.X, data_train.Y, warm_start=warm_start)
 
     print("fit finished!")
-    if test:
-        data_val = load_pascal('val')
-    else:
-        data_val = load_pascal('kVal')
-    data_val = add_edges(data_val, 'independent' if independent else
-                         "pairwise")
-    data_val = add_edge_features(data_val)
-    eval_on_sp(data_val, ssvm.predict(data_val.X), print_results=True)
+    #if test:
+        #data_val = load_pascal('val')
+    #else:
+        #data_val = load_pascal('kVal')
+    #data_val = add_edges(data_val, 'independent' if independent else
+                         #"pairwise")
+    #data_val = add_edge_features(ds, data_val)
+    #eval_on_sp(ds, data_val, ssvm.predict(data_val.X), print_results=True)
 
 if __name__ == "__main__":
     #for C in 10. ** np.arange(-4, 2):
         #main(C)
-    main(1, test=True)
+    main(1, test=False)
