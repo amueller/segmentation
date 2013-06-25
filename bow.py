@@ -7,6 +7,7 @@ from skimage.color import rgb2gray
 from sklearn.utils import shuffle
 
 from sklearn.cluster import MiniBatchKMeans
+from sklearn.preprocessing import Normalizer
 #from sklearn.cluster import KMeans
 #import os
 
@@ -186,7 +187,10 @@ def bag_of_words(descs, spixel, coordinates, vq=None, n_words=1000):
                              batch_size=2 * n_words, compute_labels=False,
                              reassignment_ratio=0.0, random_state=1, n_init=3)
         #vq = KMeans(n_clusters=n_words, verbose=10, init='random')
-        vq.fit(shuffle(np.vstack(descs)))
+        descs_stacked = shuffle(np.vstack(descs))
+        if len(descs_stacked) > 1e6:
+            descs_stacked = descs_stacked[::10]
+        vq.fit(descs_stacked)
     else:
         n_words = vq.n_clusters
 
@@ -204,13 +208,16 @@ class SiftBOW(object):
     def __init__(self, dataset, n_words=300):
         self.dataset = dataset
         self.n_words = n_words
+        self.normalizer = Normalizer(norm='l1')
 
     def fit_transform(self, image_names, superpixels):
         descriptors, coordinates = sift_descriptors(image_names, self.dataset)
         print("end sift descriptors")
         vq, X = bag_of_words(descriptors, superpixels, coordinates)
+        X = [self.normalizer.transform(x) for x in X]
         self.vq_ = vq
-        Y = gt_in_sp(self.dataset, image_names, superpixels)
+        Y = [gt_in_sp(self.dataset, f, sp) for f, sp in zip(image_names,
+                                                            superpixels)]
         return DataBunch(X, Y, image_names, superpixels)
 
     def fit(self, image_names, spixel):
@@ -220,5 +227,7 @@ class SiftBOW(object):
     def transform(self, image_names, superpixels):
         descriptors, coordinates = sift_descriptors(image_names, self.dataset)
         _, X = bag_of_words(descriptors, superpixels, coordinates, vq=self.vq_)
-        Y = gt_in_sp(self.dataset, image_names, superpixels)
+        Y = [gt_in_sp(self.dataset, f, sp) for f, sp in zip(image_names,
+                                                            superpixels)]
+        X = [self.normalizer.transform(x) for x in X]
         return DataBunch(X, Y, image_names, superpixels)
