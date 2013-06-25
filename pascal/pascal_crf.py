@@ -51,10 +51,10 @@ def main(C=1, test=False):
                                      n_features=data_train.X[0][0].shape[1],
                                      inference_method='qpbo',
                                      class_weight=class_weights,
-                                     n_edge_features=6,
-                                     symmetric_edge_features=[0, 1, 2, 3, 4],
-                                     antisymmetric_edge_features=[5])
-    experiment_name = "edge_features_more_colors_kval%f" % C
+                                     n_edge_features=3,
+                                     symmetric_edge_features=[0, 1],
+                                     antisymmetric_edge_features=[2])
+    experiment_name = "edge_features_trainval_ad3_refit%f" % C
     #warm_start = True
     warm_start = False
     ssvm = learners.OneSlackSSVM(
@@ -74,8 +74,6 @@ def main(C=1, test=False):
             file_name=experiment_name + "_refit.pickle",
             save_every=10)
         #ssvm.learning_rate = 0.000001
-        #ssvm.cache_tol = 0.1
-        #ssvm.cache_tol_ = 0.1
 
         ssvm.model.inference_method = 'ad3'
         #ssvm.n_jobs = 1
