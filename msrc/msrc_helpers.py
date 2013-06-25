@@ -12,12 +12,8 @@ from sklearn.externals.joblib import Memory
 #from sklearn.metrics import confusion_matrix
 from sklearn.kernel_approximation import AdditiveChi2Sampler
 
-
 from datasets.msrc import MSRC21Dataset
-#from latent_crf_experiments.utils import (add_edges, get_edge_contrast,
-                                          #get_edge_directions)
-from latent_crf_experiments.utils import (get_edge_contrast,
-                                          get_edge_directions)
+
 
 # stores information that was COMPUTED from the dataset + file names for
 # correspondence
@@ -232,19 +228,6 @@ def eval_on_pixels(data, sp_predictions, print_results=True):
     result = msrc.eval_pixel_performance(data.file_names, pixel_predictions,
                                          print_results=print_results)
     return result
-
-
-def add_edge_features(data):
-    X = []
-    msrc = MSRC21Dataset()
-    for x, superpixels, file_name in zip(data.X, data.superpixels,
-                                         data.file_names):
-        features = [np.ones((x[1].shape[0], 1))]
-        image = msrc.get_image(file_name)
-        features.append(get_edge_contrast(x[1], image, superpixels))
-        features.append(get_edge_directions(x[1], superpixels))
-        X.append((x[0], x[1], np.hstack(features)))
-    return DataBunch(X, data.Y, data.file_names, data.superpixels)
 
 
 def plot_confusion_matrix(dataset, confusion, title=None):
