@@ -248,3 +248,13 @@ def eval_on_sp(dataset, data, Y_pred, print_results=False):
     Y_true = [dataset.get_ground_truth(f) for f in data.file_names]
     return eval_on_pixels(dataset, Y_true, Y_pred_pixels,
                           print_results=print_results)
+
+
+@memory.cache
+def add_global_descriptor(data):
+    # adds to each superpixel a feature consisting of the average over the
+    # image
+    global_descs = map(lambda x: x.sum(axis=0) / x.shape[0], data.X)
+    X_new = [np.hstack([x, np.repeat(d[np.newaxis, :], x.shape[0], axis=0)])
+             for d, x in zip(global_descs, data.X)]
+    return DataBunch(X_new, data.Y, data.file_names, data.superpixels)

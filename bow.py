@@ -72,43 +72,6 @@ def rgsift(image):
     return loc, np.hstack(descs)
 
 
-def global_descriptors(images, dataset, vq=None, n_words=1000):
-
-    descriptors, _ = sift_descriptors(images, dataset)
-    vq, bow = global_bow(descriptors, vq=vq, n_words=n_words)
-    return vq, bow
-
-
-@memory.cache
-def global_bow(descs, vq=None, n_words=1000):
-    """Compute bag of words from sift descriptors and superpixels.
-
-    Parameters
-    ----------
-    descs : list of ndarray
-        For each image, array of sift descriptors.
-
-    vq : Clustering Object or None.
-        Fitted clustering object or None if clustering should be performed.
-
-    n_words : int
-        Number of words, i.e. clusters to find. Default=1000.
-    """
-
-    if vq is None:
-        vq = MiniBatchKMeans(n_clusters=n_words, verbose=1, init='random',
-                             batch_size=2 * n_words, compute_labels=False,
-                             reassignment_ratio=0.0, random_state=1, n_init=3)
-        #vq = KMeans(n_clusters=n_words, verbose=10, init='random')
-        vq.fit(shuffle(np.vstack(descs)))
-    else:
-        n_words = vq.n_clusters
-
-    bows = [np.bincount(vq.predict(desc), minlength=n_words).astype(np.float32)
-            for desc in descs]
-    return vq, bows
-
-
 @memory.cache
 def extract_spatial_pyramid(images, dataset, vq=None, n_words=1000):
     descriptors, locations = sift_descriptors(images, dataset)
@@ -161,6 +124,20 @@ def sift_descriptors(images, dataset):
 
 
 @memory.cache
+def color_sift_descriptors(images, dataset):
+    descs = []
+    coordinates = []
+    print("computing color sift descriptors")
+    for f in images:
+        print("processing image %s" % f)
+        image = dataset.get_image(f)
+        coords, sift = rgsift(image)
+        descs.append(sift)
+        coordinates.append(coords)
+    return descs, coordinates
+
+
+@memory.cache
 def bag_of_words(descs, spixel, coordinates, vq=None, n_words=1000):
     """Compute bag of words from sift descriptors and superpixels.
 
@@ -205,16 +182,25 @@ def bag_of_words(descs, spixel, coordinates, vq=None, n_words=1000):
 
 
 class SiftBOW(object):
-    def __init__(self, dataset, n_words=300):
+    def __init__(self, dataset, n_words=300, add_global_desc=True,
+                 color_sift=False):
         self.dataset = dataset
         self.n_words = n_words
+        self.add_global_desc = add_global_desc
         self.normalizer = Normalizer(norm='l1')
+        self.color_sift = color_sift
+        if self.color_sift:
+            self.feature_extractor = color_sift_descriptors
+        else:
+            self.feature_extractor = sift_descriptors
 
     def fit_transform(self, image_names, superpixels):
-        descriptors, coordinates = sift_descriptors(image_names, self.dataset)
+        descriptors, coordinates = self.feature_extractor(image_names,
+                                                          self.dataset)
         print("end sift descriptors")
         vq, X = bag_of_words(descriptors, superpixels, coordinates)
         X = [self.normalizer.transform(x) for x in X]
+
         self.vq_ = vq
         Y = [gt_in_sp(self.dataset, f, sp) for f, sp in zip(image_names,
                                                             superpixels)]
@@ -225,7 +211,8 @@ class SiftBOW(object):
         return self
 
     def transform(self, image_names, superpixels):
-        descriptors, coordinates = sift_descriptors(image_names, self.dataset)
+        descriptors, coordinates = self.feature_extractor(image_names,
+                                                          self.dataset)
         _, X = bag_of_words(descriptors, superpixels, coordinates, vq=self.vq_)
         Y = [gt_in_sp(self.dataset, f, sp) for f, sp in zip(image_names,
                                                             superpixels)]
