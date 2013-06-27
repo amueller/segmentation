@@ -89,6 +89,10 @@ def add_edges(data, kind="pairwise"):
     if kind == "independent":
         X_new = [(x, np.empty((0, 2), dtype=np.int)) for x in data.X]
 
+    elif kind == "extended":
+        X_new = [(x, extend_edges(region_graph(sp)))
+                 for x, sp in zip(data.X, data.superpixels)]
+
     elif kind == "fully_connected":
         X_new = [(x, np.vstack([e for e in
                                 itertools.combinations(np.arange(len(x)), 2)]))
@@ -121,14 +125,23 @@ def region_graph(regions):
     return unique_crossings
 
 
-def get_edge_contrast(edges, image, superpixels):
+def extend_edges(edges):
+    # returns all paths of length one or two in the graph given by edges
+    n_vertices = np.max(edges) + 1
+    neighborhood_graph = sparse.coo_matrix((np.ones(len(edges)), edges.T),
+                                           shape=(n_vertices, n_vertices))
+    path = neighborhood_graph + neighborhood_graph * neighborhood_graph
+    return np.c_[path.nonzero()]
+
+
+def get_edge_contrast(edges, image, superpixels, gamma=10):
     r = np.bincount(superpixels.ravel(), weights=image[:, :, 0].ravel())
     g = np.bincount(superpixels.ravel(), weights=image[:, :, 1].ravel())
     b = np.bincount(superpixels.ravel(), weights=image[:, :, 2].ravel())
     mean_colors = (np.vstack([r, g, b])
                    / np.bincount(superpixels.ravel())).T / 255.
-    contrasts = [np.exp(-10. * np.linalg.norm(mean_colors[e[0]]
-                                              - mean_colors[e[1]]))
+    contrasts = [np.exp(-gamma * np.linalg.norm(mean_colors[e[0]]
+                                                - mean_colors[e[1]]))
                  for e in edges]
     return np.vstack(contrasts)
 
