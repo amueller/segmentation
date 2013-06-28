@@ -212,13 +212,24 @@ def plot_results(dataset, data, Y_pred, folder="figures",
         plt.close(fig)
 
 
-def add_edge_features(dataset, data):
+def add_edge_features(dataset, data, more_colors=False):
     X = []
     for x, superpixels, file_name in zip(data.X, data.superpixels,
                                          data.file_names):
         features = [np.ones((x[1].shape[0], 1))]
         image = dataset.get_image(file_name)
-        features.append(get_edge_contrast(x[1], image, superpixels))
+        if more_colors:
+            features.append(get_edge_contrast(x[1], image, superpixels,
+                                              gamma=5))
+            features.append(get_edge_contrast(x[1], image, superpixels,
+                                              gamma=10))
+            features.append(get_edge_contrast(x[1], image, superpixels,
+                                              gamma=20))
+            features.append(get_edge_contrast(x[1], image, superpixels,
+                                              gamma=100))
+        else:
+            features.append(get_edge_contrast(x[1], image, superpixels,
+                                              gamma=10))
         features.append(get_edge_directions(x[1], superpixels))
         X.append((x[0], x[1], np.hstack(features)))
     return DataBunch(X, data.Y, data.file_names, data.superpixels)
