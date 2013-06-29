@@ -125,13 +125,15 @@ def region_graph(regions):
     return unique_crossings
 
 
-def extend_edges(edges):
+def extend_edges(edges, length=2):
     # returns all paths of length one or two in the graph given by edges
     n_vertices = np.max(edges) + 1
-    neighborhood_graph = sparse.coo_matrix((np.ones(len(edges)), edges.T),
-                                           shape=(n_vertices, n_vertices))
-    path = neighborhood_graph + neighborhood_graph * neighborhood_graph
-    return np.c_[path.nonzero()]
+    graph = sparse.coo_matrix((np.ones(len(edges)), edges.T),
+                              shape=(n_vertices, n_vertices))
+    neighborhood = graph
+    for i in range(length - 1):
+        graph = graph + neighborhood * graph
+    return np.c_[graph.nonzero()]
 
 
 def get_edge_contrast(edges, image, superpixels, gamma=10):
