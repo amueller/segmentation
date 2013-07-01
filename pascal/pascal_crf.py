@@ -6,7 +6,7 @@ from pystruct.utils import SaveLogger
 
 from datasets.pascal import PascalSegmentation
 from pascal_helpers import load_pascal
-from latent_crf_experiments.utils import (discard_void, add_edges, eval_on_sp,
+from latent_crf_experiments.utils import (discard_void, add_edges,
                                           add_edge_features)
 
 
@@ -54,19 +54,19 @@ def main(C=1, test=False):
                                      n_edge_features=3,
                                      symmetric_edge_features=[0, 1],
                                      antisymmetric_edge_features=[2])
-    experiment_name = "edge_features_trainval_ad3_refit%f" % C
+    experiment_name = "edge_features_kval_subgradient%f" % C
     #warm_start = True
     warm_start = False
-    ssvm = learners.OneSlackSSVM(
-        model, verbose=2, C=C, max_iter=1000000, n_jobs=-1,
-        tol=0.0001, show_loss_every=50, inference_cache=50, cache_tol='auto',
-        logger=SaveLogger(experiment_name + ".pickle", save_every=100),
-        inactive_threshold=1e-5, break_on_bad=False, inactive_window=50,
-        switch_to_ad3=False)
-    #ssvm = learners.SubgradientSSVM(
-        #model, verbose=3, C=C, max_iter=10000, n_jobs=-1, show_loss_every=10,
-        #logger=SaveLogger(experiment_name + ".pickle", save_every=10),
-        #momentum=0, learning_rate=0.001, decay_exponent=1)
+    #ssvm = learners.OneSlackSSVM(
+        #model, verbose=2, C=C, max_iter=1000000, n_jobs=-1,
+        #tol=0.0001, show_loss_every=50, inference_cache=50, cache_tol='auto',
+        #logger=SaveLogger(experiment_name + ".pickle", save_every=100),
+        #inactive_threshold=1e-5, break_on_bad=False, inactive_window=50,
+        #switch_to_ad3=False)
+    ssvm = learners.SubgradientSSVM(
+        model, verbose=3, C=C, max_iter=10000, n_jobs=-1, show_loss_every=10,
+        logger=SaveLogger(experiment_name + ".pickle", save_every=10),
+        momentum=0, learning_rate=0.1, decay_exponent=1, decay_t0=100)
 
     if warm_start:
         ssvm = SaveLogger(experiment_name + ".pickle").load()
@@ -93,4 +93,4 @@ def main(C=1, test=False):
 if __name__ == "__main__":
     #for C in 10. ** np.arange(-4, 2):
         #main(C)
-    main(1, test=False)
+    main(100, test=False)

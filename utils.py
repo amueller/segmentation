@@ -155,11 +155,11 @@ def get_superpixel_centers(superpixels):
     return centers
 
 
-def get_center_distances(superpixels, edges):
+def get_center_distances(edges, superpixels):
     centers = get_superpixel_centers(superpixels)
     distances = np.sum((centers[edges[:, 0]] - centers[edges[:, 1]]) ** 2,
                        axis=1)
-    return distances
+    return distances[:, np.newaxis]
 
 
 @memory.cache
@@ -193,8 +193,8 @@ def add_edge_features(dataset, data, more_colors=False):
         else:
             features.append(get_edge_contrast(x[1], image, superpixels,
                                               gamma=10))
+        features.append(get_center_distances(x[1], superpixels))
         features.append(get_edge_directions(x[1], superpixels))
-        #features.append(get_center_distances(x[1], superpixels))
         X.append((x[0], x[1], np.hstack(features)))
     return DataBunch(X, data.Y, data.file_names, data.superpixels)
 
