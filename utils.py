@@ -159,6 +159,8 @@ def get_center_distances(edges, superpixels):
     centers = get_superpixel_centers(superpixels)
     distances = np.sum((centers[edges[:, 0]] - centers[edges[:, 1]]) ** 2,
                        axis=1)
+    distances -= distances.min()
+    distances /= distances.max()
     return distances[:, np.newaxis]
 
 
