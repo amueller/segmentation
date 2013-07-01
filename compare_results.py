@@ -25,9 +25,9 @@ def main():
     dataset = PascalSegmentation()
     print("done")
     data1 = add_edges(data, kind="pairwise")
-    data2 = add_edges(data, kind="pairwise")
+    data2 = add_edges(data, kind="extended")
     data1 = add_edge_features(dataset, data1)
-    #data2 = add_edge_features(data2)
+    data2 = add_edge_features(dataset, data2, more_colors=True)
     Y_pred1 = ssvm1.predict(data1.X)
     Y_pred2 = ssvm2.predict(data2.X)
     folder = argv[3]
@@ -67,7 +67,9 @@ def main():
         axes[1, 1].imshow(image)
         axes[1, 1].imshow(y_pred2[superpixels], alpha=.7, cmap=dataset.cmap,
                           vmin=0, vmax=dataset.cmap.N)
-        present_y = np.unique(np.hstack([y_pred1, y_pred2]))
+        present_y = np.unique(np.hstack([y_pred1, y_pred2, np.unique(gt)]))
+        present_y = np.array([y_ for y_ in present_y if y_ !=
+                              dataset.void_label])
         axes[0, 2].imshow(present_y[:, np.newaxis], interpolation='nearest',
                           cmap=dataset.cmap, vmin=0, vmax=dataset.cmap.N)
         for i, c in enumerate(present_y):
