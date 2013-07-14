@@ -2,17 +2,25 @@ from collections import namedtuple
 
 import numpy as np
 from scipy import sparse
+from scipy.io import loadmat
 
 from sklearn.externals.joblib import Memory
+from skimage import morphology
+from skimage.segmentation import boundaries
+from skimage.measure import regionprops
+from skimage.filter import sobel
+from skimage.color import rgb2gray
 from slic_python import slic_n
 
 from datasets.pascal import PascalSegmentation
-from latent_crf_experiments.utils import gt_in_sp
+from latent_crf_experiments.utils import (gt_in_sp, region_graph,
+                                          get_mean_colors)
 
 
 memory = Memory(cachedir="/tmp/cache")
 pascal_path = "/home/local/datasets/VOC2011/TrainVal/VOCdevkit/VOC2011"
-
+segments_path = ("/home/user/amueller/tools/cpmc_new/"
+                 "cpmc_release1/data/MySegmentsMat")
 
 # stores information that was COMPUTED from the dataset + file names for
 # correspondence
@@ -58,13 +66,23 @@ def generate_pascal_split():
 
 
 @memory.cache
-def load_pascal(which='train', year="2010"):
+def load_pascal(which='train', year="2010", sp_type="slic"):
     pascal = PascalSegmentation()
     files = pascal.get_split(which=which, year=year)
     X, Y, superpixels = [], [], []
     for f in files:
         image = pascal.get_image(f)
-        superpixels.append(slic_n(image, n_superpixels=100, compactness=10))
+        if sp_type == "slic":
+            superpixels.append(slic_n(image, n_superpixels=100,
+                                      compactness=10))
+        elif sp_type == "cpmc":
+            _, sp = superpixels_segments(f)
+            sp, _ = merge_small_sp(image, sp)
+            sp = morphological_clean_sp(image, sp, 4)
+            superpixels.append(sp)
+        else:
+            raise ValueError("Expected sp to be 'slic' or 'cpmc', got %s" %
+                             sp_type)
         X.append(get_kraehenbuehl_pot_sp(f, superpixels[-1]))
         if which != "test":
             Y.append(gt_in_sp(pascal, f, superpixels[-1]))
@@ -85,3 +103,71 @@ def get_kraehenbuehl_pot_sp(filename, superpixels):
     sp_probs = sp_probs.toarray()
     # renormalize (same as dividing by sp sizes)
     return sp_probs / sp_probs.sum(axis=-1)[:, np.newaxis]
+
+
+def superpixels_segments(filename):
+    mat_file = segments_path + "/" + filename
+    segments = loadmat(mat_file)['top_masks']
+    n_segments = segments.shape[2]
+    added = (segments * 2. ** np.arange(-50, n_segments - 50)).sum(axis=-1)
+    _, added = np.unique(added, return_inverse=True)
+    labels = morphology.label(added.reshape(segments.shape[:2]), neighbors=4)
+    return segments, labels
+
+
+def get_pb(filename):
+    pb = loadmat(segments_path[:-13] + "PB/" + filename +
+                 "_PB.mat")['gPb_thin']
+    return pb
+
+
+def merge_small_sp(image, regions, min_size=50):
+    shape = regions.shape
+    _, regions = np.unique(regions, return_inverse=True)
+    regions = regions.reshape(shape[:2])
+    edges = region_graph(regions)
+    mean_colors = get_mean_colors(image, regions)
+    mask = np.bincount(regions.ravel()) < min_size
+    # also don't use very thin regions
+    props = regionprops(regions + 1, properties=['MinorAxisLength',
+                                                 'MajorAxisLength'])
+    min_len = np.array([min(p['MinorAxisLength'], p['MajorAxisLength']) for p
+                        in props])
+    mask[min_len <= 5] = True
+
+    for r in np.where(mask)[0]:
+        # get neighbors:
+        neighbors1 = edges[edges[:, 0] == r, 1]
+        neighbors2 = edges[edges[:, 1] == r, 0]
+        neighbors = np.concatenate([neighbors1, neighbors2])
+        neighbors = neighbors[neighbors != r]
+        # get closest in color
+        distances = np.sum((mean_colors[r] - mean_colors[neighbors]) ** 2,
+                           axis=-1)
+        nearest = np.argmin(distances)
+        # merge
+        new = neighbors[nearest]
+        regions[regions == r] = new
+        edges[edges == r] = new
+    old_numbers = regions
+    _, regions = np.unique(regions, return_inverse=True)
+    regions = regions.reshape(shape[:2])
+    grr = np.bincount(regions.ravel()) < min_size
+    if np.any(grr):
+        from IPython.core.debugger import Tracer
+        Tracer()()
+    return regions, old_numbers
+
+
+def morphological_clean_sp(image, segments, diameter=4):
+    # remove small / thin segments by morphological closing + watershed
+    # extract boundaries
+    boundary = boundaries.find_boundaries(segments)
+    closed = morphology.binary_closing(boundary, np.ones((diameter, diameter)))
+    # extract regions
+    labels = morphology.label(closed, neighbors=4, background=1)
+    # watershed to get rid of boundaries
+    # interestingly we can't use gPb here. It is to sharp.
+    edge_image = sobel(rgb2gray(image))
+    result = morphology.watershed(edge_image, labels + 1)
+    return result
