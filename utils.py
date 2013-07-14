@@ -87,7 +87,7 @@ def add_edges(data, kind="pairwise"):
         X_new = [(x, np.empty((0, 2), dtype=np.int)) for x in data.X]
 
     elif kind == "extended":
-        X_new = [(x, extend_edges(region_graph(sp)))
+        X_new = [(x, extend_edges(region_graph(sp), length=3))
                  for x, sp in zip(data.X, data.superpixels)]
 
     elif kind == "fully_connected":
@@ -103,6 +103,21 @@ def add_edges(data, kind="pairwise"):
                          % kind)
 
     return DataBunch(X_new, data.Y, data.file_names, data.superpixels)
+
+
+def radius_graph(superpixels, eps=40):
+    n_vertices = np.max(superpixels) + 1
+    centers = np.empty((n_vertices, 2))
+    gridx, gridy = np.mgrid[:superpixels.shape[0], :superpixels.shape[1]]
+
+    for v in xrange(n_vertices):
+        centers[v] = [gridy[superpixels == v].mean(),
+                      gridx[superpixels == v].mean()]
+    edges = []
+    for e in itertools.combinations(np.arange(n_vertices), 2):
+        if np.linalg.norm(centers[e[0]] - centers[e[1]]) < eps:
+            edges.append(e)
+    return np.vstack(edges)
 
 
 def region_graph(regions):
@@ -133,12 +148,17 @@ def extend_edges(edges, length=2):
     return np.c_[graph.nonzero()]
 
 
-def get_edge_contrast(edges, image, superpixels, gamma=10):
+def get_mean_colors(image, superpixels):
     r = np.bincount(superpixels.ravel(), weights=image[:, :, 0].ravel())
     g = np.bincount(superpixels.ravel(), weights=image[:, :, 1].ravel())
     b = np.bincount(superpixels.ravel(), weights=image[:, :, 2].ravel())
     mean_colors = (np.vstack([r, g, b])
                    / np.bincount(superpixels.ravel())).T / 255.
+    return mean_colors
+
+
+def get_edge_contrast(edges, image, superpixels, gamma=10):
+    mean_colors = get_mean_colors(image, superpixels)
     contrasts = [np.exp(-gamma * np.linalg.norm(mean_colors[e[0]]
                                                 - mean_colors[e[1]]))
                  for e in edges]
@@ -161,7 +181,7 @@ def get_center_distances(edges, superpixels):
                        axis=1)
     distances -= distances.min()
     distances /= distances.max()
-    return distances[:, np.newaxis]
+    return np.exp(-distances[:, np.newaxis] * 2.)
 
 
 @memory.cache
@@ -177,7 +197,8 @@ def get_edge_directions(edges, superpixels):
     return np.vstack(directions)
 
 
-def add_edge_features(dataset, data, more_colors=False):
+def add_edge_features(dataset, data, more_colors=False,
+                      center_distances=False):
     X = []
     for x, superpixels, file_name in zip(data.X, data.superpixels,
                                          data.file_names):
@@ -195,7 +216,8 @@ def add_edge_features(dataset, data, more_colors=False):
         else:
             features.append(get_edge_contrast(x[1], image, superpixels,
                                               gamma=10))
-        features.append(get_center_distances(x[1], superpixels))
+        if center_distances:
+            features.append(get_center_distances(x[1], superpixels))
         features.append(get_edge_directions(x[1], superpixels))
         X.append((x[0], x[1], np.hstack(features)))
     return DataBunch(X, data.Y, data.file_names, data.superpixels)
