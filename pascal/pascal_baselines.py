@@ -132,16 +132,15 @@ def eval_segment_best_possible():
     tracer()
 
 
-def eval_pixel_best_possible():
-    data = load_pascal('val')
+def eval_spixel_best_possible():
+    data = load_pascal('kTrain', sp_type='cpmc')
     pascal = PascalSegmentation()
     hamming, jaccard = eval_on_sp(pascal, data, data.Y, print_results=True)
-    tracer()
 
 if __name__ == "__main__":
     #visualize_pascal()
-    #eval_pixel_best_possible()
+    eval_spixel_best_possible()
     #eval_pixel_prediction()
     #eval_sp_prediction()
-    train_svm(C=10000)
+    #train_svm(C=10000)
     #eval_segment_best_possible()
