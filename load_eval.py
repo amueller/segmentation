@@ -7,7 +7,7 @@ import numpy as np
 #from sklearn.metrics import confusion_matrix
 
 from pystruct.utils import SaveLogger
-from pystruct.models import LatentNodeCRF, EdgeFeatureGraphCRF
+from pystruct.models import LatentNodeCRF
 
 from msrc import msrc_helpers
 from latent_crf_experiments.hierarchical_segmentation import \
@@ -57,14 +57,8 @@ def main():
         for data_str, title in zip(["train", "val"],
                                    ["TRAINING SET", "VALIDATION SET"]):
             print(title)
-            #independent = True
-            independent = False
-            if isinstance(ssvm.model, EdgeFeatureGraphCRF):
-                independent = False
+            edge_type = "pairwise"
 
-            if ssvm.model.inference_method == 'dai':
-                independent = True
-                print("DAI DAI DAI")
             #data = load_data_global_probs(data_str, latent=True)
             if dataset == 'msrc':
                 ds = MSRC21Dataset()
@@ -75,18 +69,18 @@ def main():
                                                               which="train")
             elif dataset == 'pascal':
                 ds = PascalSegmentation()
-                #data = pascal_helpers.load_pascal("kTrainVal" if data_str ==
-                                                  #'train' else "kTest")
-                data = pascal_helpers.load_pascal(data_str)
+                data = pascal_helpers.load_pascal("kVal" if data_str ==
+                                                  'train' else "val")
+                #data = pascal_helpers.load_pascal(data_str)
             else:
                 raise ValueError("Excepted dataset to be 'pascal' or 'msrc',"
                                  " got %s." % dataset)
-            data = add_edges(data, "independent" if independent else
-                             "pairwise")
+            data = add_edges(data, edge_type)
             # may Guido have mercy on my soul
             #(I renamed the module after pickling)
             if type(ssvm.model).__name__ == 'EdgeFeatureGraphCRF':
-                data = add_edge_features(ds, data)
+                data = add_edge_features(ds, data, more_colors=False,
+                                         center_distances=False)
             if type(ssvm.model).__name__ == "LatentNodeCRF":
                 # hack for old pickles
                 if not hasattr(ssvm.model, 'n_input_states'):
@@ -103,7 +97,7 @@ def main():
                 data = make_hierarchical_data(
                     ds, data, lateral=True, latent=True, latent_lateral=False,
                     add_edge_features=True)
-            ssvm.model.inference_method = "qpbo"
+            #ssvm.model.inference_method = "qpbo"
             Y_pred = ssvm.predict(data.X)
 
             if isinstance(ssvm.model, LatentNodeCRF):
@@ -143,7 +137,7 @@ def main():
                 data, which="train")
             if type(ssvm.model).__name__ == 'EdgeFeatureGraphCRF':
                 data = msrc_helpers.add_edge_features(data)
-            #ssvm.model.inference_method = 'qpbo'
+            ssvm.model.inference_method = 'qpbo'
             if isinstance(ssvm.model, LatentNodeCRF):
                 data = msrc_helpers.make_hierarchical_data(data, lateral=True,
                                                            latent=True)
