@@ -25,9 +25,9 @@ def main():
     dataset = PascalSegmentation()
     print("done")
     data1 = add_edges(data, kind="pairwise")
-    data2 = add_edges(data, kind="extended")
+    data2 = add_edges(data, kind="pairwise")
     data1 = add_edge_features(dataset, data1)
-    data2 = add_edge_features(dataset, data2, more_colors=True)
+    data2 = add_edge_features(dataset, data2)
     Y_pred1 = ssvm1.predict(data1.X)
     Y_pred2 = ssvm2.predict(data2.X)
     folder = argv[3]

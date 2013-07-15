@@ -47,18 +47,16 @@ def train_svm(C=0.1, grid=False):
                                    verbose=10, scoring=scorer, n_jobs=-1)
         grid_search.fit(X, y)
     else:
-        data_train = load_pascal("kVal")
+        data_train = load_pascal("train")
         X, y = np.vstack(data_train.X), np.hstack(data_train.Y)
         svm.fit(X, y)
         print(svm.score(X, y))
         eval_on_sp(ds, data_train, [svm.predict(x) for x in data_train.X],
                    print_results=True)
 
-        data_val = load_pascal("kTest")
+        data_val = load_pascal("val")
         eval_on_sp(ds, data_val, [svm.predict(x) for x in data_val.X],
                    print_results=True)
-
-    tracer()
 
 
 def visualize_pascal(plot_probabilities=False):
@@ -139,8 +137,9 @@ def eval_spixel_best_possible():
 
 if __name__ == "__main__":
     #visualize_pascal()
-    eval_spixel_best_possible()
+    #eval_spixel_best_possible()
     #eval_pixel_prediction()
     #eval_sp_prediction()
-    #train_svm(C=10000)
+    for C in [1, 100]:
+        train_svm(C=C)
     #eval_segment_best_possible()

@@ -69,8 +69,9 @@ def main():
                                                               which="train")
             elif dataset == 'pascal':
                 ds = PascalSegmentation()
-                data = pascal_helpers.load_pascal("kVal" if data_str ==
-                                                  'train' else "val")
+                data = pascal_helpers.load_pascal("kTrain" if data_str ==
+                                                  'train' else "kVal",
+                                                  sp_type="cpmc")
                 #data = pascal_helpers.load_pascal(data_str)
             else:
                 raise ValueError("Excepted dataset to be 'pascal' or 'msrc',"
@@ -79,8 +80,7 @@ def main():
             # may Guido have mercy on my soul
             #(I renamed the module after pickling)
             if type(ssvm.model).__name__ == 'EdgeFeatureGraphCRF':
-                data = add_edge_features(ds, data, more_colors=False,
-                                         center_distances=False)
+                data = add_edge_features(ds, data)
             if type(ssvm.model).__name__ == "LatentNodeCRF":
                 # hack for old pickles
                 if not hasattr(ssvm.model, 'n_input_states'):

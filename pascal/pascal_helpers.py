@@ -170,3 +170,17 @@ def morphological_clean_sp(image, segments, diameter=4):
     result = morphology.watershed(edge_image, labels + 1)
     # we want them to start at zero!
     return result - 1
+
+
+def create_segment_sp_graph(segments, superpixels):
+    #n_segments = segments.shape[2]
+    n_superpixels = len(np.unique(superpixels))
+    assert(n_superpixels == np.max(superpixels) + 1)
+    edges = []
+    for sp in range(n_superpixels):
+        sp_indicator = superpixels == sp
+        overlaps = segments[sp_indicator].sum(axis=0)
+        includes = overlaps > np.sum(sp_indicator) / 2.
+        for i in np.where(includes)[0]:
+            edges.append([sp, i])
+    return np.array(edges)

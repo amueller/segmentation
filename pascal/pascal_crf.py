@@ -17,14 +17,15 @@ tracer = Tracer()
 def main(C=1, test=False):
     ds = PascalSegmentation()
     # load training data
-    edge_type = "extended"
+    edge_type = "pairwise"
     if test:
-        data_train = load_pascal("train")
+        which = "train"
     else:
-        data_train = load_pascal("kTrain")
+        which = "kTrain"
+    data_train = load_pascal(which=which, sp_type="cpmc")
 
     data_train = add_edges(data_train, edge_type)
-    data_train = add_edge_features(ds, data_train, more_colors=True)
+    data_train = add_edge_features(ds, data_train)
     data_train = discard_void(ds, data_train, ds.void_label)
 
     n_states = 21
@@ -39,15 +40,14 @@ def main(C=1, test=False):
                                      n_features=data_train.X[0][0].shape[1],
                                      inference_method='qpbo',
                                      class_weight=class_weights,
-                                     n_edge_features=7,
-                                     symmetric_edge_features=[0, 1, 2, 3, 4,
-                                                              5],
-                                     antisymmetric_edge_features=[6])
-    experiment_name = "extended_edges_val_more_colors_distance%f" % C
+                                     n_edge_features=3,
+                                     symmetric_edge_features=[0, 1],
+                                     antisymmetric_edge_features=[2])
+    experiment_name = "cpmc_edge_features_trainval_%f" % C
     #warm_start = True
     warm_start = False
     ssvm = learners.OneSlackSSVM(
-        model, verbose=2, C=C, max_iter=1000000, n_jobs=-1,
+        model, verbose=2, C=C, max_iter=100000, n_jobs=-1,
         tol=0.0001, show_loss_every=50, inference_cache=50, cache_tol='auto',
         logger=SaveLogger(experiment_name + ".pickle", save_every=100),
         inactive_threshold=1e-5, break_on_bad=False, inactive_window=50,
@@ -68,6 +68,7 @@ def main(C=1, test=False):
         #ssvm.n_jobs = 1
 
     ssvm.fit(data_train.X, data_train.Y, warm_start=warm_start)
+    return
 
     print("fit finished!")
     if test:
