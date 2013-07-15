@@ -113,9 +113,23 @@ def superpixels_segments(filename):
     mat_file = segments_path + "/" + filename
     segments = loadmat(mat_file)['top_masks']
     n_segments = segments.shape[2]
-    added = (segments * 2. ** np.arange(-50, n_segments - 50)).sum(axis=-1)
+    if n_segments > 100:
+        raise ValueError("Need to rewrite... float only holds so many values.")
+    # 2**50 + 1 is different from 2 ** 5. But 2 ** 50 + 2 ** -50 is not
+    # different from 2 ** 50  so we do this in two stages
+    added = (segments[:, :, :50] *
+             2. ** np.arange(min(50, n_segments))).sum(axis=-1)
     _, added = np.unique(added, return_inverse=True)
+
+    if n_segments > 50:
+        added2 = (segments[:, :, 50:] *
+                  2. ** np.arange(n_segments - 50)).sum(axis=-1)
+        _, added2 = np.unique(added2, return_inverse=True)
+        added = added + (np.max(added) + 1) * added2
+        _, added = np.unique(added, return_inverse=True)
+
     labels = morphology.label(added.reshape(segments.shape[:2]), neighbors=4)
+
     return segments, labels
 
 
