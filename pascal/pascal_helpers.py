@@ -7,7 +7,7 @@ from scipy.io import loadmat
 from sklearn.externals.joblib import Memory
 from skimage import morphology
 from skimage.segmentation import boundaries
-from skimage.measure import regionprops
+#from skimage.measure import regionprops
 from skimage.filter import sobel
 from skimage.color import rgb2gray
 from slic_python import slic_n
@@ -128,17 +128,14 @@ def merge_small_sp(image, regions, min_size=50):
     edges = region_graph(regions)
     mean_colors = get_mean_colors(image, regions)
     mask = np.bincount(regions.ravel()) < min_size
-    # also don't use very thin regions
-    props = regionprops(regions + 1, properties=['MinorAxisLength',
-                                                 'MajorAxisLength'])
-    min_len = np.array([min(p['MinorAxisLength'], p['MajorAxisLength']) for p
-                        in props])
-    mask[min_len <= 5] = True
-
+    # mapping of old labels to new labels
+    new_labels = np.arange(len(np.unique(regions)))
     for r in np.where(mask)[0]:
         # get neighbors:
-        neighbors1 = edges[edges[:, 0] == r, 1]
-        neighbors2 = edges[edges[:, 1] == r, 0]
+        where_0 = edges[:, 0] == r
+        where_1 = edges[:, 1] == r
+        neighbors1 = edges[where_0, 1]
+        neighbors2 = edges[where_1, 0]
         neighbors = np.concatenate([neighbors1, neighbors2])
         neighbors = neighbors[neighbors != r]
         # get closest in color
@@ -147,16 +144,17 @@ def merge_small_sp(image, regions, min_size=50):
         nearest = np.argmin(distances)
         # merge
         new = neighbors[nearest]
-        regions[regions == r] = new
-        edges[edges == r] = new
-    old_numbers = regions
+        new_labels[new_labels == r] = new
+        edges[where_0, 0] = new
+        edges[where_1, 1] = new
+    regions = new_labels[regions]
     _, regions = np.unique(regions, return_inverse=True)
     regions = regions.reshape(shape[:2])
     grr = np.bincount(regions.ravel()) < min_size
     if np.any(grr):
         from IPython.core.debugger import Tracer
         Tracer()()
-    return regions, old_numbers
+    return regions, new_labels
 
 
 def morphological_clean_sp(image, segments, diameter=4):
@@ -170,4 +168,5 @@ def morphological_clean_sp(image, segments, diameter=4):
     # interestingly we can't use gPb here. It is to sharp.
     edge_image = sobel(rgb2gray(image))
     result = morphology.watershed(edge_image, labels + 1)
-    return result
+    # we want them to start at zero!
+    return result - 1
