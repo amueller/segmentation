@@ -14,7 +14,9 @@ from slic_python import slic_n
 
 from datasets.pascal import PascalSegmentation
 from latent_crf_experiments.utils import (gt_in_sp, region_graph,
-                                          get_mean_colors)
+                                          get_mean_colors, DataBunch)
+from latent_crf_experiments.hierarchical_segmentation \
+    import HierarchicalDataBunch
 
 
 memory = Memory(cachedir="/tmp/cache")
@@ -24,7 +26,6 @@ segments_path = ("/home/user/amueller/tools/cpmc_new/"
 
 # stores information that was COMPUTED from the dataset + file names for
 # correspondence
-DataBunch = namedtuple('DataBunch', 'X, Y, file_names, superpixels')
 DataBunchNoSP = namedtuple('DataBunchNoSP', 'X, Y, file_names')
 
 
@@ -54,24 +55,14 @@ def load_pascal_pixelwise(which='train', year="2010"):
     return DataBunchNoSP(X, Y, files)
 
 
-def generate_pascal_split():
-    # split the training set into train1 and train2 for validation
-    base_path = pascal_path + "/ImageSets/Segmentation/"
-    files = np.loadtxt(base_path + "train.txt", dtype=np.str)
-    np.random.seed(0)
-    inds = np.random.permutation(len(files))
-    n_train2 = len(files) // 5
-    np.savetxt(base_path + "train1.txt", files[inds > n_train2], fmt="%s")
-    np.savetxt(base_path + "train2.txt", files[inds < n_train2], fmt="%s")
-
-
 def load_pascal_single(f, sp_type, which, pascal):
         print(f)
         image = pascal.get_image(f)
         if sp_type == "slic":
             sp = slic_n(image, n_superpixels=100, compactness=10)
+            segments = None
         elif sp_type == "cpmc":
-            _, sp = superpixels_segments(f)
+            segments, sp = superpixels_segments(f)
             sp, _ = merge_small_sp(image, sp)
             sp = morphological_clean_sp(image, sp, 4)
         else:
@@ -80,7 +71,7 @@ def load_pascal_single(f, sp_type, which, pascal):
         x = get_kraehenbuehl_pot_sp(f, sp)
         if which != "test":
             y = gt_in_sp(pascal, f, sp)
-        return x, y, sp
+        return x, y, sp, segments
 
 
 @memory.cache
@@ -96,9 +87,11 @@ def load_pascal(which='train', year="2010", sp_type="slic", n_jobs=-1):
         #superpixels.append(sp)
     results = Parallel(n_jobs=n_jobs)(delayed(load_pascal_single)(
         f, which=which, sp_type=sp_type, pascal=pascal) for f in files)
-    X, Y, superpixels = zip(*results)
-
-    return DataBunch(X, Y, files, superpixels)
+    X, Y, superpixels, segments = zip(*results)
+    if sp_type == "slic":
+        return DataBunch(X, Y, files, superpixels)
+    else:
+        return HierarchicalDataBunch(X, Y, files, superpixels, segments)
 
 
 def get_kraehenbuehl_pot_sp(filename, superpixels):
@@ -195,3 +188,16 @@ def create_segment_sp_graph(segments, superpixels):
         for i in np.where(includes)[0]:
             edges.append([sp, i])
     return np.array(edges)
+
+
+def make_cpmc_hierarchy(dataset, data):
+    X_new = []
+    for x, superpixels, segments in zip(data.X, data.superpixels,
+                                        data.segments):
+        edges = create_segment_sp_graph(segments, superpixels)
+        n_superpixels = len(np.unique(superpixels))
+        n_segments = segments.shape[2]
+        edges[:, 1] += n_superpixels
+        X_new.append((x, edges, n_segments))
+    return HierarchicalDataBunch(X_new, data.Y, data.file_names,
+                                 data.superpixels, data.segments)
