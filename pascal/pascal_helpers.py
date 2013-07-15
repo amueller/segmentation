@@ -4,7 +4,7 @@ import numpy as np
 from scipy import sparse
 from scipy.io import loadmat
 
-from sklearn.externals.joblib import Memory
+from sklearn.externals.joblib import Memory, Parallel, delayed
 from skimage import morphology
 from skimage.segmentation import boundaries
 #from skimage.measure import regionprops
@@ -65,27 +65,38 @@ def generate_pascal_split():
     np.savetxt(base_path + "train2.txt", files[inds < n_train2], fmt="%s")
 
 
-@memory.cache
-def load_pascal(which='train', year="2010", sp_type="slic"):
-    pascal = PascalSegmentation()
-    files = pascal.get_split(which=which, year=year)
-    X, Y, superpixels = [], [], []
-    for f in files:
+def load_pascal_single(f, sp_type, which, pascal):
+        print(f)
         image = pascal.get_image(f)
         if sp_type == "slic":
-            superpixels.append(slic_n(image, n_superpixels=100,
-                                      compactness=10))
+            sp = slic_n(image, n_superpixels=100, compactness=10)
         elif sp_type == "cpmc":
             _, sp = superpixels_segments(f)
             sp, _ = merge_small_sp(image, sp)
             sp = morphological_clean_sp(image, sp, 4)
-            superpixels.append(sp)
         else:
             raise ValueError("Expected sp to be 'slic' or 'cpmc', got %s" %
                              sp_type)
-        X.append(get_kraehenbuehl_pot_sp(f, superpixels[-1]))
+        x = get_kraehenbuehl_pot_sp(f, sp)
         if which != "test":
-            Y.append(gt_in_sp(pascal, f, superpixels[-1]))
+            y = gt_in_sp(pascal, f, sp)
+        return x, y, sp
+
+
+@memory.cache
+def load_pascal(which='train', year="2010", sp_type="slic", n_jobs=-1):
+    pascal = PascalSegmentation()
+    files = pascal.get_split(which=which, year=year)
+    #X, Y, superpixels = [], [], []
+    #for f in files:
+        #x, y, sp = load_pascal_single(f, which=which, sp_type=sp_type,
+                                      #pascal=pascal)
+        #X.append(x)
+        #Y.append(y)
+        #superpixels.append(sp)
+    results = Parallel(n_jobs=n_jobs)(delayed(load_pascal_single)(
+        f, which=which, sp_type=sp_type, pascal=pascal) for f in files)
+    X, Y, superpixels = zip(*results)
 
     return DataBunch(X, Y, files, superpixels)
 
