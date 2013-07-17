@@ -190,11 +190,14 @@ def create_segment_sp_graph(segments, superpixels):
     return np.array(edges)
 
 
+@memory.cache
 def make_cpmc_hierarchy(dataset, data):
     X_new = []
-    for x, superpixels, segments in zip(data.X, data.superpixels,
-                                        data.segments):
-        edges = create_segment_sp_graph(segments, superpixels)
+    all_edges = Parallel(n_jobs=-1)(
+        delayed(create_segment_sp_graph)(segments, superpixels)
+        for superpixels, segments in zip(data.superpixels, data.segments))
+    for x, superpixels, segments, edges in zip(data.X, data.superpixels,
+                                               data.segments, all_edges):
         n_superpixels = len(np.unique(superpixels))
         n_segments = segments.shape[2]
         edges[:, 1] += n_superpixels
