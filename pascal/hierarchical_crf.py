@@ -25,11 +25,12 @@ def svm_on_segments(C=.1, learning_rate=.001, subgradient=False):
     n_states = 21
     class_weights = 1. / np.bincount(np.hstack(Y_))
     class_weights *= 21. / np.sum(class_weights)
-    experiment_name = ("latent_50_cpmc_%f__kval" % C)
+    experiment_name = ("latent_10_cpmc_%f_qpbo_n_slack" % C)
     logger = SaveLogger(experiment_name + ".pickle", save_every=10)
     model = LatentNodeCRF(n_labels=n_states,
                           n_features=data_train.X[0][0].shape[1],
-                          n_hidden_states=50, inference_method='qpbo',
+                          n_hidden_states=10,
+                          inference_method='qpbo',
                           class_weight=class_weights,
                           latent_node_features=False)
     if subgradient:
@@ -40,11 +41,17 @@ def svm_on_segments(C=.1, learning_rate=.001, subgradient=False):
     else:
         latent_logger = SaveLogger("lssvm_" + experiment_name +
                                    "_%d.pickle", save_every=1)
-        base_ssvm = learners.OneSlackSSVM(
-            model, verbose=2, C=C, max_iter=100000, n_jobs=-1, tol=0.001,
-            show_loss_every=200, inference_cache=50, logger=logger,
-            cache_tol='auto', inactive_threshold=1e-5, break_on_bad=False)
-        ssvm = learners.LatentSSVM(base_ssvm, logger=latent_logger)
+        #base_ssvm = learners.OneSlackSSVM(
+            #model, verbose=2, C=C, max_iter=100, n_jobs=-1, tol=0.001,
+            #show_loss_every=200, inference_cache=50, logger=logger,
+            #cache_tol='auto', inactive_threshold=1e-5, break_on_bad=False,
+            #switch_to=('ogm', {'alg': 'dd'}))
+        base_ssvm = learners.NSlackSSVM(
+            model, verbose=2, C=C, max_iter=10000, n_jobs=10, tol=0.001,
+            show_loss_every=20, logger=logger, inactive_threshold=1e-5,
+            break_on_bad=False, batch_size=10, inactive_window=10)
+        ssvm = learners.LatentSSVM(base_ssvm, logger=latent_logger,
+                                   latent_iter=3)
     #warm_start = True
     warm_start = False
     if warm_start:
