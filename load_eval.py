@@ -69,29 +69,28 @@ def main():
                                                               which="train")
             elif dataset == 'pascal':
                 ds = PascalSegmentation()
-                data = pascal_helpers.load_pascal("kTrain" if data_str ==
-                                                  'train' else "kVal",
-                                                  sp_type="cpmc")
+                data = pascal_helpers.load_pascal("kVal" if data_str ==
+                                                  'train' else "val",
+                                                  sp_type="slic")
                 #data = pascal_helpers.load_pascal(data_str)
             else:
                 raise ValueError("Excepted dataset to be 'pascal' or 'msrc',"
                                  " got %s." % dataset)
-            data = add_edges(data, edge_type)
+
+            if type(ssvm.model).__name__ == "LatentNodeCRF":
+                print("making data hierarchical")
+                data = pascal_helpers.make_cpmc_hierarchy(ds, data)
+                #data = make_hierarchical_data(
+                    #ds, data, lateral=True, latent=True, latent_lateral=False,
+                    #add_edge_features=False)
+            else:
+                data = add_edges(data, edge_type)
+
             # may Guido have mercy on my soul
             #(I renamed the module after pickling)
             if type(ssvm.model).__name__ == 'EdgeFeatureGraphCRF':
                 data = add_edge_features(ds, data)
-            if type(ssvm.model).__name__ == "LatentNodeCRF":
-                # hack for old pickles
-                if not hasattr(ssvm.model, 'n_input_states'):
-                    ssvm.model.n_input_states = ssvm.model.n_labels
-                if not hasattr(ssvm.model, 'latent_node_features'):
-                    ssvm.model.latent_node_features = False
 
-            if type(ssvm.model).__name__ == "LatentNodeCRF":
-                data = make_hierarchical_data(
-                    ds, data, lateral=True, latent=True, latent_lateral=False,
-                    add_edge_features=False)
             if type(ssvm.model).__name__ == "EdgeFeatureLatentNodeCRF":
                 data = add_edge_features(ds, data)
                 data = make_hierarchical_data(
