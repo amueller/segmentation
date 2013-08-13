@@ -3,6 +3,8 @@ import numpy as np
 from sklearn.utils import shuffle
 #from sklearn.grid_search import GridSearchCV
 
+import cPickle
+
 from pystruct import learners
 from pystruct.utils import SaveLogger
 from pystruct.models import LatentNodeCRF
@@ -15,21 +17,20 @@ tracer = Tracer()
 
 
 def svm_on_segments(C=.1, learning_rate=.001, subgradient=False):
-    ds = PascalSegmentation()
     # load and prepare data
-    data_train = load_pascal("kTrain", sp_type="cpmc")
-    data_train = make_cpmc_hierarchy(ds, data_train)
-    data_train = discard_void(ds, data_train)
-    X_, Y_ = data_train.X, data_train.Y
+    #ds = PascalSegmentation()
+    #data_train = load_pascal("kTrain", sp_type="cpmc")
+    #data_train = make_cpmc_hierarchy(ds, data_train)
+    #data_train = discard_void(ds, data_train)
+    #X_, Y_ = data_train.X, data_train.Y
+    #cPickle.dump((X_, Y_), open("data_train.pickle", "wb"), -1)
+    X_, Y_ = cPickle.load(open("data_train.pickle"))
 
-    n_states = 21
     class_weights = 1. / np.bincount(np.hstack(Y_))
     class_weights *= 21. / np.sum(class_weights)
     experiment_name = ("latent_10_cpmc_%f_qpbo_n_slack" % C)
     logger = SaveLogger(experiment_name + ".pickle", save_every=10)
-    model = LatentNodeCRF(n_labels=n_states,
-                          n_features=data_train.X[0][0].shape[1],
-                          n_hidden_states=10,
+    model = LatentNodeCRF(n_hidden_states=10,
                           inference_method='qpbo',
                           class_weight=class_weights,
                           latent_node_features=False)
@@ -47,11 +48,11 @@ def svm_on_segments(C=.1, learning_rate=.001, subgradient=False):
             #cache_tol='auto', inactive_threshold=1e-5, break_on_bad=False,
             #switch_to=('ogm', {'alg': 'dd'}))
         base_ssvm = learners.NSlackSSVM(
-            model, verbose=2, C=C, max_iter=10000, n_jobs=10, tol=0.001,
-            show_loss_every=20, logger=logger, inactive_threshold=1e-5,
-            break_on_bad=False, batch_size=10, inactive_window=10)
+            model, verbose=4, C=C, n_jobs=5, tol=0.1,
+            show_loss_every=20, logger=logger, inactive_threshold=1e-8,
+            break_on_bad=False, batch_size=5, inactive_window=10)
         ssvm = learners.LatentSSVM(base_ssvm, logger=latent_logger,
-                                   latent_iter=3)
+                                   latent_iter=5)
     #warm_start = True
     warm_start = False
     if warm_start:
