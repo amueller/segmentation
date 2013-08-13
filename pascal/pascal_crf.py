@@ -28,7 +28,6 @@ def main(C=1, test=False):
     data_train = add_edge_features(ds, data_train)
     data_train = discard_void(ds, data_train, ds.void_label)
 
-    n_states = 21
     print("number of samples: %s" % len(data_train.X))
     class_weights = 1. / np.bincount(np.hstack(data_train.Y))
     class_weights *= 21. / np.sum(class_weights)
@@ -36,14 +35,11 @@ def main(C=1, test=False):
     #model = crfs.GraphCRF(n_states=n_states,
                           #n_features=data_train.X[0][0].shape[1],
                           #inference_method='qpbo', class_weight=class_weights)
-    model = crfs.EdgeFeatureGraphCRF(n_states=n_states,
-                                     n_features=data_train.X[0][0].shape[1],
-                                     inference_method='qpbo',
+    model = crfs.EdgeFeatureGraphCRF(inference_method='qpbo',
                                      class_weight=class_weights,
-                                     n_edge_features=3,
                                      symmetric_edge_features=[0, 1],
                                      antisymmetric_edge_features=[2])
-    experiment_name = "cpmc_edge_features_trainval_%f" % C
+    experiment_name = "cpmc_edge_features_trainval_new_%f" % C
     #warm_start = True
     warm_start = False
     ssvm = learners.OneSlackSSVM(

@@ -71,7 +71,7 @@ def main():
                 ds = PascalSegmentation()
                 data = pascal_helpers.load_pascal("kVal" if data_str ==
                                                   'train' else "val",
-                                                  sp_type="slic")
+                                                  sp_type="cpmc")
                 #data = pascal_helpers.load_pascal(data_str)
             else:
                 raise ValueError("Excepted dataset to be 'pascal' or 'msrc',"
