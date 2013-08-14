@@ -1,9 +1,9 @@
 import numpy as np
+import os
+import cPickle
 
 from sklearn.utils import shuffle
 #from sklearn.grid_search import GridSearchCV
-
-import cPickle
 
 from pystruct import learners
 from pystruct.utils import SaveLogger
@@ -17,20 +17,25 @@ tracer = Tracer()
 
 
 def svm_on_segments(C=.1, learning_rate=.001, subgradient=False):
-    # load and prepare data
-    #ds = PascalSegmentation()
-    #data_train = load_pascal("kTrain", sp_type="cpmc")
-    #data_train = make_cpmc_hierarchy(ds, data_train)
-    #data_train = discard_void(ds, data_train)
-    #X_, Y_ = data_train.X, data_train.Y
-    #cPickle.dump((X_, Y_), open("data_train.pickle", "wb"), -1)
-    X_, Y_ = cPickle.load(open("data_train.pickle"))
+    data_file = "data_train.pickle"
+    if os.path.exists(data_file):
+        data_train = cPickle.load(open(data_file))
+    else:
+        ds = PascalSegmentation()
+        # load and prepare data
+        data_train = load_pascal("train", sp_type="cpmc")
+        data_train = make_cpmc_hierarchy(ds, data_train)
+        data_train = discard_void(ds, data_train)
+        cPickle.dump(data_train, open(data_file, 'wb'), -1)
+
+    X_, Y_ = data_train.X, data_train.Y
+
 
     class_weights = 1. / np.bincount(np.hstack(Y_))
     class_weights *= 21. / np.sum(class_weights)
-    experiment_name = ("latent_10_cpmc_%f_qpbo_n_slack" % C)
+    experiment_name = ("latent_25_cpmc_%f_qpbo_n_slack_blub2" % C)
     logger = SaveLogger(experiment_name + ".pickle", save_every=10)
-    model = LatentNodeCRF(n_hidden_states=10,
+    model = LatentNodeCRF(n_hidden_states=25,
                           inference_method='qpbo',
                           class_weight=class_weights,
                           latent_node_features=False)

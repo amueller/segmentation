@@ -4,6 +4,9 @@ import sys
 import matplotlib.pyplot as plt
 import numpy as np
 
+import os
+import cPickle
+
 #from sklearn.metrics import confusion_matrix
 
 from pystruct.utils import SaveLogger
@@ -58,33 +61,35 @@ def main():
                                    ["TRAINING SET", "VALIDATION SET"]):
             print(title)
             edge_type = "pairwise"
-
-            #data = load_data_global_probs(data_str, latent=True)
-            if dataset == 'msrc':
-                ds = MSRC21Dataset()
-                data = msrc_helpers.load_data(data_str,
-                                              which="piecewise_new")
-                #data = add_kraehenbuehl_features(data, which="train_30px")
-                data = msrc_helpers.add_kraehenbuehl_features(data,
-                                                              which="train")
-            elif dataset == 'pascal':
-                ds = PascalSegmentation()
-                data = pascal_helpers.load_pascal("kVal" if data_str ==
-                                                  'train' else "val",
-                                                  sp_type="cpmc")
-                #data = pascal_helpers.load_pascal(data_str)
+            data_file = "data_%s.pickle" % data_str
+            if os.path.exists(data_file):
+                data = cPickle.load(open(data_file))
             else:
-                raise ValueError("Excepted dataset to be 'pascal' or 'msrc',"
-                                 " got %s." % dataset)
+                if dataset == 'msrc':
+                    ds = MSRC21Dataset()
+                    data = msrc_helpers.load_data(data_str, which="piecewise_new")
+                    #data = add_kraehenbuehl_features(data, which="train_30px")
+                    data = msrc_helpers.add_kraehenbuehl_features(data, which="train")
+                elif dataset == 'pascal':
+                    ds = PascalSegmentation()
+                    data = pascal_helpers.load_pascal("kVal" if data_str ==
+                                                      'train' else "val",
+                                                      sp_type="cpmc")
+                    #data = pascal_helpers.load_pascal(data_str)
+                else:
+                    raise ValueError("Excepted dataset to be 'pascal' or 'msrc',"
+                                     " got %s." % dataset)
 
-            if type(ssvm.model).__name__ == "LatentNodeCRF":
-                print("making data hierarchical")
-                data = pascal_helpers.make_cpmc_hierarchy(ds, data)
-                #data = make_hierarchical_data(
-                    #ds, data, lateral=True, latent=True, latent_lateral=False,
-                    #add_edge_features=False)
-            else:
-                data = add_edges(data, edge_type)
+                if type(ssvm.model).__name__ == "LatentNodeCRF":
+                    print("making data hierarchical")
+                    data = pascal_helpers.make_cpmc_hierarchy(ds, data)
+                    #data = make_hierarchical_data(
+                        #ds, data, lateral=True, latent=True, latent_lateral=False,
+                        #add_edge_features=False)
+                else:
+                    data = add_edges(data, edge_type)
+
+                cPickle.dump(data, open(data_file, 'wb'), -1)
 
             # may Guido have mercy on my soul
             #(I renamed the module after pickling)
