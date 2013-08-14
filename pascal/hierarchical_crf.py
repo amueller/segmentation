@@ -33,7 +33,7 @@ def svm_on_segments(C=.1, learning_rate=.001, subgradient=False):
 
     class_weights = 1. / np.bincount(np.hstack(Y_))
     class_weights *= 21. / np.sum(class_weights)
-    experiment_name = ("latent_25_cpmc_%f_qpbo_n_slack_blub2" % C)
+    experiment_name = ("latent_25_cpmc_%f_qpbo_n_slack_blub3" % C)
     logger = SaveLogger(experiment_name + ".pickle", save_every=10)
     model = LatentNodeCRF(n_hidden_states=25,
                           inference_method='qpbo',
@@ -53,11 +53,12 @@ def svm_on_segments(C=.1, learning_rate=.001, subgradient=False):
             #cache_tol='auto', inactive_threshold=1e-5, break_on_bad=False,
             #switch_to=('ogm', {'alg': 'dd'}))
         base_ssvm = learners.NSlackSSVM(
-            model, verbose=4, C=C, n_jobs=5, tol=0.1,
+            model, verbose=4, C=C, n_jobs=-1, tol=0.1,
             show_loss_every=20, logger=logger, inactive_threshold=1e-8,
-            break_on_bad=False, batch_size=5, inactive_window=10)
+            break_on_bad=False, batch_size=36, inactive_window=10,
+            switch_to=('ad3', {'branch_and_bound': True}))
         ssvm = learners.LatentSSVM(base_ssvm, logger=latent_logger,
-                                   latent_iter=5)
+                                   latent_iter=3)
     #warm_start = True
     warm_start = False
     if warm_start:
