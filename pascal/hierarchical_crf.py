@@ -17,18 +17,18 @@ tracer = Tracer()
 
 
 def svm_on_segments(C=.1, learning_rate=.001, subgradient=False):
-    data_file = "data_train.pickle"
+    data_file = "data_train_XY.pickle"
+    ds = PascalSegmentation()
     if os.path.exists(data_file):
-        data_train = cPickle.load(open(data_file))
+        X_, Y_ = cPickle.load(open(data_file))
     else:
-        ds = PascalSegmentation()
         # load and prepare data
         data_train = load_pascal("train", sp_type="cpmc")
         data_train = make_cpmc_hierarchy(ds, data_train)
-        cPickle.dump(data_train, open(data_file, 'wb'), -1)
+        data_train = discard_void(ds, data_train)
+        X_, Y_ = data_train.X, data_train.Y
+        cPickle.dump((X_, Y_), open(data_file, 'wb'), -1)
 
-    data_train = discard_void(ds, data_train)
-    X_, Y_ = data_train.X, data_train.Y
 
 
     class_weights = 1. / np.bincount(np.hstack(Y_))
