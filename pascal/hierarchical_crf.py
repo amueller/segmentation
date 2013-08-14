@@ -25,9 +25,9 @@ def svm_on_segments(C=.1, learning_rate=.001, subgradient=False):
         # load and prepare data
         data_train = load_pascal("train", sp_type="cpmc")
         data_train = make_cpmc_hierarchy(ds, data_train)
-        data_train = discard_void(ds, data_train)
         cPickle.dump(data_train, open(data_file, 'wb'), -1)
 
+    data_train = discard_void(ds, data_train)
     X_, Y_ = data_train.X, data_train.Y
 
 

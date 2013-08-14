@@ -57,24 +57,25 @@ def main():
         #for data_str, title in zip(["train", "val", "test"],
                                    #["TRAINING SET", "VALIDATION SET",
                                     #"TEST SET"]):
-        for data_str, title in zip(["train", "val"],
-                                   ["TRAINING SET", "VALIDATION SET"]):
+        for data_str, title in zip(["train", "kVal", "val"],
+                                   ["TRAINING SET", "KVAL SET", "VALIDATION SET"]):
             print(title)
             edge_type = "pairwise"
             data_file = "data_%s.pickle" % data_str
+            if dataset == 'pascal':
+                ds = PascalSegmentation()
+            else:
+                ds = MSRC21Dataset()
+
             if os.path.exists(data_file):
                 data = cPickle.load(open(data_file))
             else:
                 if dataset == 'msrc':
-                    ds = MSRC21Dataset()
                     data = msrc_helpers.load_data(data_str, which="piecewise_new")
                     #data = add_kraehenbuehl_features(data, which="train_30px")
                     data = msrc_helpers.add_kraehenbuehl_features(data, which="train")
                 elif dataset == 'pascal':
-                    ds = PascalSegmentation()
-                    data = pascal_helpers.load_pascal("kVal" if data_str ==
-                                                      'train' else "val",
-                                                      sp_type="cpmc")
+                    data = pascal_helpers.load_pascal(data_str, sp_type="cpmc")
                     #data = pascal_helpers.load_pascal(data_str)
                 else:
                     raise ValueError("Excepted dataset to be 'pascal' or 'msrc',"
