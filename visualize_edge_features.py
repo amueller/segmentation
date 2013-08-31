@@ -3,21 +3,24 @@ import matplotlib.pyplot as plt
 
 from skimage.segmentation import mark_boundaries
 
-from datasets.msrc import MSRCDataset
+from datasets.nyu import NYUSegmentation
+from nyu.nyu_helpers import load_nyu
 
-from msrc_helpers import load_data
+from utils import get_edge_depth_diff, add_edges
 
 from IPython.core.debugger import Tracer
 tracer = Tracer()
 
 
 def crazy_visual():
-    msrc = MSRCDataset()
-    data = load_data("train", independent=False)
+    dataset = NYUSegmentation()
+    # load training data
+    data = load_nyu()
+    data = add_edges(data)
 
-    for x, image, image_name, superpixels, y in zip(data.X, data.images,
-                                                    data.file_names,
-                                                    data.superpixels, data.Y):
+    for x, image_name, superpixels, y in zip(data.X, data.file_names,
+                                             data.superpixels, data.Y):
+        image = dataset.get_image(image_name)
         plt.figure(figsize=(20, 20))
         bounary_image = mark_boundaries(image, superpixels)
         plt.imshow(bounary_image)
@@ -29,23 +32,25 @@ def crazy_visual():
         for v in xrange(n_vertices):
             centers[v] = [gridy[superpixels == v].mean(),
                           gridx[superpixels == v].mean()]
-        for edge in edges:
+        depth = dataset.get_depth(image_name)
+        edge_features = get_edge_depth_diff(edges, depth, superpixels, gamma=5)
+        #from IPython.core.debugger import Tracer
+        #Tracer()()
+        for i, edge in enumerate(edges):
             e0, e1 = edge
-            color = (msrc.colors[y[e0]] + msrc.colors[y[e1]]) / (2. * 255.)
+            #color = (dataset.colors[y[e0]] + dataset.colors[y[e1]]) / (2. * 255.)
+            color = "black"
             plt.plot([centers[e0][0], centers[e1][0]],
                      [centers[e0][1], centers[e1][1]],
-                     #c=['red', 'blue'][np.arcsin(diff[1]) > 0],
                      c=color,
-                     #linewidth=2 * np.abs(np.arcsin(diff[1])))
-                     #linewidth=contrast
+                     linewidth=edge_features[i] * 5
                      )
-        plt.scatter(centers[:, 0], centers[:, 1],
-                    c=msrc.colors[y] / 255., s=100)
+        plt.scatter(centers[:, 0], centers[:, 1], s=100)
         plt.tight_layout()
         plt.xlim(0, superpixels.shape[1])
         plt.ylim(superpixels.shape[0], 0)
         plt.axis("off")
-        plt.savefig("figures/crazy_edge_strength_color/%s.png" % image_name,
+        plt.savefig("figures/depth_diff/%s.png" % image_name,
                     bbox_inches="tight")
         plt.close()
 

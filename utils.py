@@ -166,6 +166,17 @@ def get_edge_contrast(edges, image, superpixels, gamma=10):
     return np.vstack(contrasts)
 
 
+def get_edge_depth_diff(edges, depth, superpixels, gamma=10):
+    mean_depth = np.bincount(superpixels.ravel(), weights=depth.ravel())
+    mean_depth = mean_depth / np.bincount(superpixels.ravel()).T
+    depth_diff = [np.exp(-gamma * np.linalg.norm(mean_depth[e[0]]
+                                                - mean_depth[e[1]]))
+                 for e in edges]
+    #depth_diff = [(mean_depth[e[0]] - mean_depth[e[1]]) ** 2
+                 #for e in edges]
+    return np.vstack(depth_diff)
+
+
 def get_superpixel_centers(superpixels):
     n_vertices = np.max(superpixels) + 1
     centers = np.empty((n_vertices, 2))
@@ -199,7 +210,7 @@ def get_edge_directions(edges, superpixels):
 
 
 def add_edge_features(dataset, data, more_colors=False,
-                      center_distances=False):
+                      center_distances=False, depth_diff=False):
     X = []
     for x, superpixels, file_name in zip(data.X, data.superpixels,
                                          data.file_names):
@@ -217,6 +228,9 @@ def add_edge_features(dataset, data, more_colors=False,
         else:
             features.append(get_edge_contrast(x[1], image, superpixels,
                                               gamma=10))
+        if depth_diff:
+            depth = dataset.get_depth(file_name)
+            features.append(get_edge_depth_diff(x[1], depth, superpixels, gamma=10))
         if center_distances:
             features.append(get_center_distances(x[1], superpixels))
         features.append(get_edge_directions(x[1], superpixels))

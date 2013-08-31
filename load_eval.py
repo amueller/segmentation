@@ -13,15 +13,17 @@ from pystruct.utils import SaveLogger
 from pystruct.models import LatentNodeCRF
 
 from msrc import msrc_helpers
+from pascal import pascal_helpers
+from nyu import nyu_helpers
 from latent_crf_experiments.hierarchical_segmentation import \
     make_hierarchical_data
 
 from datasets.msrc import MSRC21Dataset
 from datasets.pascal import PascalSegmentation
+from datasets.nyu import NYUSegmentation
 
 from utils import add_edges, eval_on_sp, add_edge_features
 
-from pascal import pascal_helpers
 
 
 def main():
@@ -46,24 +48,26 @@ def main():
         argv.append("acc")
 
     if len(argv) <= 3:
-        dataset = 'pascal'
+        dataset = 'nyu'
     else:
         dataset = argv[3]
 
     if argv[2] == 'acc':
 
-        ssvm.n_jobs = -1
+        ssvm.n_jobs = 1
 
         #for data_str, title in zip(["train", "val", "test"],
                                    #["TRAINING SET", "VALIDATION SET",
                                     #"TEST SET"]):
-        for data_str, title in zip(["train", "kVal", "val"],
-                                   ["TRAINING SET", "KVAL SET", "VALIDATION SET"]):
+        for data_str, title in zip(["train", "val"],
+                                   ["TRAINING SET", "VALIDATION SET"]):
             print(title)
             edge_type = "pairwise"
             data_file = "data_%s.pickle" % data_str
             if dataset == 'pascal':
                 ds = PascalSegmentation()
+            elif dataset == 'nyu':
+                ds = NYUSegmentation()
             else:
                 ds = MSRC21Dataset()
 
@@ -77,8 +81,10 @@ def main():
                 elif dataset == 'pascal':
                     data = pascal_helpers.load_pascal(data_str, sp_type="cpmc")
                     #data = pascal_helpers.load_pascal(data_str)
+                elif dataset == 'nyu':
+                    data = nyu_helpers.load_nyu(data_str)
                 else:
-                    raise ValueError("Excepted dataset to be 'pascal' or 'msrc',"
+                    raise ValueError("Excepted dataset to be 'nyu', 'pascal' or 'msrc',"
                                      " got %s." % dataset)
 
                 if type(ssvm.model).__name__ == "LatentNodeCRF":
@@ -109,21 +115,18 @@ def main():
                 Y_pred = [ssvm.model.label_from_latent(h) for h in Y_pred]
             Y_flat = np.hstack(data.Y)
 
+            print("superpixel accuracy: %.2f"
+                  % (np.mean((np.hstack(Y_pred) == Y_flat)[Y_flat != ds.void_label]) * 100))
+
             if dataset == 'msrc':
-                print("superpixel accuracy: %.2f"
-                      % (np.mean((np.hstack(Y_pred) == Y_flat)[Y_flat != 21]) *
-                         100))
                 res = msrc_helpers.eval_on_pixels(data, Y_pred,
                                                   print_results=True)
                 print("global: %.2f, average: %.2f" % (res['global'] * 100,
                                                        res['average'] * 100))
                 #msrc_helpers.plot_confusion_matrix(res['confusion'])
-            elif dataset == 'pascal':
-                print("superpixel accuracy: %.2f"
-                      % (np.mean((np.hstack(Y_pred) == Y_flat)[Y_flat != 255])
-                         * 100))
+            else:
                 hamming, jaccard = eval_on_sp(ds, data, Y_pred,
-                                              print_results=False)
+                                              print_results=True)
                 print("Jaccard: %.2f, Hamming: %.2f" % (jaccard.mean(),
                                                         hamming.mean()))
 

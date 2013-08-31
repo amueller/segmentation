@@ -34,7 +34,7 @@ def load_nyu(ds='train'):
     for file_name in dataset.get_split(ds):
         print(file_name)
         ## load image to generate superpixels
-        image = dataset.load_image(file_name)
+        image = dataset.get_image(file_name)
         sp = slic_n(image, n_superpixels=100, compactness=10)
         gt = gt_in_sp(dataset, file_name, sp)
         Y.append(gt)
