@@ -9,6 +9,7 @@ from sklearn.externals.joblib import Memory
 from pystruct.utils import make_grid_edges
 
 DataBunch = namedtuple('DataBunch', 'X, Y, file_names, superpixels')
+DataBunchNoSP = namedtuple('DataBunchNoSP', 'X, Y, file_names')
 
 memory = Memory(cachedir="/tmp/cache", verbose=1)
 
@@ -231,11 +232,12 @@ def gt_in_sp(dataset, filename, superpixels):
 
 
 def eval_on_pixels(dataset, Y_true, Y_pred, print_results=False):
-    tp, tn, fp, fn = np.zeros(21), np.zeros(21), np.zeros(21), np.zeros(21)
+    n_classes = len(dataset.classes) - 1  # -1 for void
+    tp, tn, fp, fn = [np.zeros(n_classes) for i in xrange(4)]
     for y_true, y_pred in zip(Y_true, Y_pred):
         mask = y_true != dataset.void_label
         y_true, y_pred = y_true[mask], y_pred[mask]
-        for k in range(21):
+        for k in range(n_classes):
             tp[k] += np.sum((y_true == k) * (y_pred == k))
             tn[k] += np.sum((y_true != k) * (y_pred != k))
             fp[k] += np.sum((y_true != k) * (y_pred == k))
@@ -270,3 +272,19 @@ def add_global_descriptor(data):
     X_new = [np.hstack([x, np.repeat(d[np.newaxis, :], x.shape[0], axis=0)])
              for d, x in zip(global_descs, data.X)]
     return DataBunch(X_new, data.Y, data.file_names, data.superpixels)
+
+
+def probabilities_on_sp(ds, probabilities, superpixels):
+    # accumulate votes in superpixels
+    # interleaved repeat
+    n_classes = len(ds.classes) - 1
+    class_indices = np.repeat(np.arange(n_classes)[np.newaxis, :],
+                              superpixels.size, axis=0).ravel()
+    # non-interleaved repeat
+    superpixel_indices = np.repeat(superpixels.ravel(), n_classes)
+    sp_probs = sparse.coo_matrix((probabilities.ravel(),
+                                  (superpixel_indices, class_indices)))
+    sp_probs = sp_probs.toarray().astype(np.float)
+    # renormalize (same as dividing by sp sizes)
+    return sp_probs / sp_probs.sum(axis=-1)[:, np.newaxis]
+

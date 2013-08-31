@@ -9,8 +9,9 @@ from scipy.misc import imread
 
 from datasets.nyu import NYUSegmentation
 
-#from slic_python import slic_n
-from latent_crf_experiments.utils import DataBunchNoSP
+from slic_python import slic_n
+from latent_crf_experiments.utils import (DataBunchNoSP, DataBunch, gt_in_sp,
+                                          probabilities_on_sp)
 
 memory = Memory(cachedir="/tmp/cache")
 
@@ -21,38 +22,35 @@ def get_probabilities(file_name, path):
         f = ("%s/prediction_all/%s_lab_image_label_%d.png"
              % (path, file_name, label))
         probabilities.append(imread(f)[:, :, 0])
-    probabilities = np.dstack(probabilities)
-    return probabilities
+    probabilities = np.dstack(probabilities).astype(np.float)
+    return probabilities / 255.
 
 
-#@memory.cache
+@memory.cache
 def load_nyu(ds='train'):
-    if ds not in ['train', 'val']:
-        raise ValueError("ds should be 'train' or 'val', got %s." % ds)
-    ## load image to generate superpixels
-    #if ds == 'train':
-        #image_path = data_path + "training/"
-    #else:
-        #image_path = data_path + "validation/"
-    #for image_file in glob(image_path + "*_lab_image.png")[:10]:
-        #print(image_file)
-        #image = imread(image_file)
-        #segments = slic_n(image, n_superpixels=100, compactness=10)
-        #boundary_image = mark_boundaries(image, segments)
-        #plt.figure()
-        #plt.imshow(boundary_image)
-    #plt.show()
+    dataset = NYUSegmentation()
+    # load image to generate superpixels
+    file_names, X, Y, superpixels = [], [], [], []
+    for file_name in dataset.get_split(ds):
+        print(file_name)
+        ## load image to generate superpixels
+        image = dataset.load_image(file_name)
+        sp = slic_n(image, n_superpixels=100, compactness=10)
+        gt = gt_in_sp(dataset, file_name, sp)
+        Y.append(gt)
+        superpixels.append(sp)
+        file_names.append(file_name)
+        probs = get_probabilities(file_name, dataset.directory)
+        X.append(probabilities_on_sp(dataset, probs, sp))
+
+    return DataBunch(X, Y, file_names, superpixels)
 
 
 @memory.cache
 def load_nyu_pixelwise(ds='train'):
     dataset = NYUSegmentation()
-    if ds not in ['train', 'val']:
-        raise ValueError("ds should be 'train' or 'val', got %s." % ds)
     # load image to generate superpixels
-    file_names = []
-    X = []
-    Y = []
+    file_names, X, Y = [], [], []
     for file_name in dataset.get_split(ds):
         print(file_name)
         file_names.append(file_name)

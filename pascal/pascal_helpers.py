@@ -1,7 +1,4 @@
-from collections import namedtuple
-
 import numpy as np
-from scipy import sparse
 from scipy.io import loadmat
 
 from sklearn.externals.joblib import Memory, Parallel, delayed
@@ -14,7 +11,8 @@ from slic_python import slic_n
 
 from datasets.pascal import PascalSegmentation
 from latent_crf_experiments.utils import (gt_in_sp, region_graph,
-                                          get_mean_colors, DataBunch)
+                                          get_mean_colors, DataBunch,
+                                          DataBunchNoSP, probabilities_on_sp)
 from latent_crf_experiments.hierarchical_segmentation \
     import HierarchicalDataBunch
 
@@ -24,9 +22,6 @@ pascal_path = "/home/local/datasets/VOC2011/TrainVal/VOCdevkit/VOC2011"
 segments_path = ("/home/user/amueller/tools/cpmc_new/"
                  "cpmc_release1/data/MySegmentsMat")
 
-# stores information that was COMPUTED from the dataset + file names for
-# correspondence
-DataBunchNoSP = namedtuple('DataBunchNoSP', 'X, Y, file_names')
 
 
 def load_kraehenbuehl(filename):
@@ -96,17 +91,8 @@ def load_pascal(which='train', year="2010", sp_type="slic", n_jobs=-1):
 
 def get_kraehenbuehl_pot_sp(filename, superpixels):
     probs = load_kraehenbuehl(filename)
-    # accumulate votes in superpixels
-    # interleaved repeat
-    class_indices = np.repeat(np.arange(21)[np.newaxis, :],
-                              superpixels.size, axis=0).ravel()
-    # non-interleaved repeat
-    superpixel_indices = np.repeat(superpixels.ravel(), 21)
-    sp_probs = sparse.coo_matrix((probs.ravel(), (superpixel_indices,
-                                                  class_indices)))
-    sp_probs = sp_probs.toarray()
-    # renormalize (same as dividing by sp sizes)
-    return sp_probs / sp_probs.sum(axis=-1)[:, np.newaxis]
+    ds = PascalSegmentation()
+    return probabilities_on_sp(ds, probs, superpixels)
 
 
 def superpixels_segments(filename):
