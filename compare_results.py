@@ -5,9 +5,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from pystruct.utils import SaveLogger
-from datasets.pascal import PascalSegmentation
+from datasets.nyu import NYUSegmentation
 
-from pascal.pascal_helpers import load_pascal
+from nyu.nyu_helpers import load_nyu
 from utils import add_edges, add_edge_features, eval_on_pixels
 
 
@@ -21,13 +21,13 @@ def main():
     if len(argv) <= 3:
         raise ValueError("Need a folder name for plotting.")
     print("loading data...")
-    data = load_pascal(data_str)
-    dataset = PascalSegmentation()
+    data = load_nyu(data_str, n_sp=500)
+    dataset = NYUSegmentation()
     print("done")
     data1 = add_edges(data, kind="pairwise")
     data2 = add_edges(data, kind="pairwise")
     data1 = add_edge_features(dataset, data1)
-    data2 = add_edge_features(dataset, data2)
+    data2 = add_edge_features(dataset, data2, depth_diff=True)
     Y_pred1 = ssvm1.predict(data1.X)
     Y_pred2 = ssvm2.predict(data2.X)
     folder = argv[3]
@@ -41,6 +41,17 @@ def main():
                                                          Y_pred1, Y_pred2):
         if np.all(y_pred1 == y_pred2):
             continue
+        gt = dataset.get_ground_truth(image_name)
+        perf1 = eval_on_pixels(dataset, [gt], [y_pred1[superpixels]],
+                              print_results=False)[0]
+        perf1 = np.mean(perf1[np.isfinite(perf1)])
+
+        perf2 = eval_on_pixels(dataset, [gt], [y_pred2[superpixels]],
+                              print_results=False)[0]
+        perf2 = np.mean(perf2[np.isfinite(perf2)])
+        if np.abs(perf1 - perf2) < 2:
+            continue
+
         image = dataset.get_image(image_name)
         fig, axes = plt.subplots(2, 3, figsize=(12, 6))
         axes[0, 0].imshow(image)
@@ -49,21 +60,14 @@ def main():
 
         axes[0, 1].set_title("ground truth")
         axes[0, 1].imshow(image)
-        gt = dataset.get_ground_truth(image_name)
         axes[0, 1].imshow(gt, alpha=.7, cmap=dataset.cmap, vmin=0,
                           vmax=dataset.cmap.N)
-        perf = eval_on_pixels(dataset, [gt], [y_pred1[superpixels]],
-                              print_results=False)[0]
-        perf = np.mean(perf[np.isfinite(perf)])
-        axes[1, 0].set_title("%.2f" % perf)
+        axes[1, 0].set_title("%.2f" % perf1)
         axes[1, 0].imshow(image)
         axes[1, 0].imshow(y_pred1[superpixels], vmin=0, vmax=dataset.cmap.N,
                           alpha=.7, cmap=dataset.cmap)
 
-        perf = eval_on_pixels(dataset, [gt], [y_pred2[superpixels]],
-                              print_results=False)[0]
-        perf = np.mean(perf[np.isfinite(perf)])
-        axes[1, 1].set_title("%.2f" % perf)
+        axes[1, 1].set_title("%.2f" % perf2)
         axes[1, 1].imshow(image)
         axes[1, 1].imshow(y_pred2[superpixels], alpha=.7, cmap=dataset.cmap,
                           vmin=0, vmax=dataset.cmap.N)
