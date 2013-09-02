@@ -4,8 +4,6 @@ import sys
 import matplotlib.pyplot as plt
 import numpy as np
 
-import os
-import cPickle
 
 #from sklearn.metrics import confusion_matrix
 
@@ -63,7 +61,6 @@ def main():
                                    ["TRAINING SET", "VALIDATION SET"]):
             print(title)
             edge_type = "pairwise"
-            data_file = "data_%s.pickle" % data_str
             if dataset == 'pascal':
                 ds = PascalSegmentation()
             elif dataset == 'nyu':
@@ -71,37 +68,32 @@ def main():
             else:
                 ds = MSRC21Dataset()
 
-            if os.path.exists(data_file):
-                data = cPickle.load(open(data_file))
+            if dataset == 'msrc':
+                data = msrc_helpers.load_data(data_str, which="piecewise_new")
+                #data = add_kraehenbuehl_features(data, which="train_30px")
+                data = msrc_helpers.add_kraehenbuehl_features(data, which="train")
+            elif dataset == 'pascal':
+                data = pascal_helpers.load_pascal(data_str, sp_type="cpmc")
+                #data = pascal_helpers.load_pascal(data_str)
+            elif dataset == 'nyu':
+                data = nyu_helpers.load_nyu(data_str, n_sp=500)
             else:
-                if dataset == 'msrc':
-                    data = msrc_helpers.load_data(data_str, which="piecewise_new")
-                    #data = add_kraehenbuehl_features(data, which="train_30px")
-                    data = msrc_helpers.add_kraehenbuehl_features(data, which="train")
-                elif dataset == 'pascal':
-                    data = pascal_helpers.load_pascal(data_str, sp_type="cpmc")
-                    #data = pascal_helpers.load_pascal(data_str)
-                elif dataset == 'nyu':
-                    data = nyu_helpers.load_nyu(data_str)
-                else:
-                    raise ValueError("Excepted dataset to be 'nyu', 'pascal' or 'msrc',"
-                                     " got %s." % dataset)
+                raise ValueError("Excepted dataset to be 'nyu', 'pascal' or 'msrc',"
+                                 " got %s." % dataset)
 
-                if type(ssvm.model).__name__ == "LatentNodeCRF":
-                    print("making data hierarchical")
-                    data = pascal_helpers.make_cpmc_hierarchy(ds, data)
-                    #data = make_hierarchical_data(
-                        #ds, data, lateral=True, latent=True, latent_lateral=False,
-                        #add_edge_features=False)
-                else:
-                    data = add_edges(data, edge_type)
-
-                cPickle.dump(data, open(data_file, 'wb'), -1)
+            if type(ssvm.model).__name__ == "LatentNodeCRF":
+                print("making data hierarchical")
+                data = pascal_helpers.make_cpmc_hierarchy(ds, data)
+                #data = make_hierarchical_data(
+                    #ds, data, lateral=True, latent=True, latent_lateral=False,
+                    #add_edge_features=False)
+            else:
+                data = add_edges(data, edge_type)
 
             # may Guido have mercy on my soul
             #(I renamed the module after pickling)
             if type(ssvm.model).__name__ == 'EdgeFeatureGraphCRF':
-                data = add_edge_features(ds, data)
+                data = add_edge_features(ds, data, depth_diff=False)
 
             if type(ssvm.model).__name__ == "EdgeFeatureLatentNodeCRF":
                 data = add_edge_features(ds, data)
@@ -126,7 +118,7 @@ def main():
                 #msrc_helpers.plot_confusion_matrix(res['confusion'])
             else:
                 hamming, jaccard = eval_on_sp(ds, data, Y_pred,
-                                              print_results=True)
+                                              print_results=False)
                 print("Jaccard: %.2f, Hamming: %.2f" % (jaccard.mean(),
                                                         hamming.mean()))
 
