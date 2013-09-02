@@ -73,13 +73,6 @@ def load_pascal_single(f, sp_type, which, pascal):
 def load_pascal(which='train', year="2010", sp_type="slic", n_jobs=-1):
     pascal = PascalSegmentation()
     files = pascal.get_split(which=which, year=year)
-    #X, Y, superpixels = [], [], []
-    #for f in files:
-        #x, y, sp = load_pascal_single(f, which=which, sp_type=sp_type,
-                                      #pascal=pascal)
-        #X.append(x)
-        #Y.append(y)
-        #superpixels.append(sp)
     results = Parallel(n_jobs=n_jobs)(delayed(load_pascal_single)(
         f, which=which, sp_type=sp_type, pascal=pascal) for f in files)
     X, Y, superpixels, segments = zip(*results)

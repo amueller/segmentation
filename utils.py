@@ -5,13 +5,13 @@ import itertools
 import numpy as np
 from scipy import sparse
 
-from sklearn.externals.joblib import Memory
+from sklearn.externals.joblib import Memory, Parallel, delayed
 from pystruct.utils import make_grid_edges
 
 DataBunch = namedtuple('DataBunch', 'X, Y, file_names, superpixels')
 DataBunchNoSP = namedtuple('DataBunchNoSP', 'X, Y, file_names')
 
-memory = Memory(cachedir="/tmp/cache", verbose=1)
+memory = Memory(cachedir="/home/data/amueller/cache", verbose=1)
 
 
 @memory.cache
@@ -196,7 +196,6 @@ def get_center_distances(edges, superpixels):
     return np.exp(-distances[:, np.newaxis] * 2.)
 
 
-@memory.cache
 def get_edge_directions(edges, superpixels):
     centers = get_superpixel_centers(superpixels)
 
@@ -209,32 +208,51 @@ def get_edge_directions(edges, superpixels):
     return np.vstack(directions)
 
 
+def edge_features_single(dataset, x, superpixels, file_name, more_colors=False,
+                         depth_diff=False, center_distances=False):
+    features = [np.ones((x[1].shape[0], 1))]
+    image = dataset.get_image(file_name)
+    if more_colors:
+        features.append(get_edge_contrast(x[1], image, superpixels,
+                                          gamma=5))
+        features.append(get_edge_contrast(x[1], image, superpixels,
+                                          gamma=10))
+        features.append(get_edge_contrast(x[1], image, superpixels,
+                                          gamma=20))
+        features.append(get_edge_contrast(x[1], image, superpixels,
+                                          gamma=100))
+    else:
+        features.append(get_edge_contrast(x[1], image, superpixels,
+                                          gamma=10))
+    if depth_diff:
+        depth = dataset.get_depth(file_name)
+        features.append(get_edge_depth_diff(x[1], depth, superpixels, gamma=10))
+    if center_distances:
+        features.append(get_center_distances(x[1], superpixels))
+
+    features.append(get_edge_directions(x[1], superpixels))
+    return np.hstack(features)
+
+
+@memory.cache
 def add_edge_features(dataset, data, more_colors=False,
                       center_distances=False, depth_diff=False):
-    X = []
-    for x, superpixels, file_name in zip(data.X, data.superpixels,
-                                         data.file_names):
-        features = [np.ones((x[1].shape[0], 1))]
-        image = dataset.get_image(file_name)
-        if more_colors:
-            features.append(get_edge_contrast(x[1], image, superpixels,
-                                              gamma=5))
-            features.append(get_edge_contrast(x[1], image, superpixels,
-                                              gamma=10))
-            features.append(get_edge_contrast(x[1], image, superpixels,
-                                              gamma=20))
-            features.append(get_edge_contrast(x[1], image, superpixels,
-                                              gamma=100))
-        else:
-            features.append(get_edge_contrast(x[1], image, superpixels,
-                                              gamma=10))
-        if depth_diff:
-            depth = dataset.get_depth(file_name)
-            features.append(get_edge_depth_diff(x[1], depth, superpixels, gamma=10))
-        if center_distances:
-            features.append(get_center_distances(x[1], superpixels))
-        features.append(get_edge_directions(x[1], superpixels))
-        X.append((x[0], x[1], np.hstack(features)))
+    all_edge_features = Parallel(n_jobs=-1, verbose=4)(
+        delayed(edge_features_single)( dataset, x, superpixels, file_name,
+                                      more_colors=more_colors,
+                                      center_distances=center_distances,
+                                      depth_diff=depth_diff)
+        for x, superpixels, file_name in zip(data.X, data.superpixels,
+                                             data.file_names))
+    #X = []
+    #for x, superpixels, file_name in zip(data.X, data.superpixels,
+                                         #data.file_names):
+        #features = edge_features_single(dataset, x, superpixels, file_name,
+                                        #more_colors=more_colors,
+                                        #center_distances=center_distances,
+                                        #depth_diff=depth_diff)
+        #X.append((x[0], x[1], np.hstack(features)))
+    X = [(x[0], x[1], features) for x, features in zip(data.X, all_edge_features)]
     return DataBunch(X, data.Y, data.file_names, data.superpixels)
 
 
@@ -288,7 +306,7 @@ def add_global_descriptor(data):
     return DataBunch(X_new, data.Y, data.file_names, data.superpixels)
 
 
-def probabilities_on_sp(ds, probabilities, superpixels):
+def probabilities_on_sp(ds, probabilities, superpixels, add_covariance=False):
     # accumulate votes in superpixels
     # interleaved repeat
     n_classes = len(ds.classes) - 1
@@ -300,5 +318,11 @@ def probabilities_on_sp(ds, probabilities, superpixels):
                                   (superpixel_indices, class_indices)))
     sp_probs = sp_probs.toarray().astype(np.float)
     # renormalize (same as dividing by sp sizes)
-    return sp_probs / sp_probs.sum(axis=-1)[:, np.newaxis]
+    sp_probs =  sp_probs / sp_probs.sum(axis=-1)[:, np.newaxis]
+    if add_covariance:
+        covars = []
+        for i in np.unique(superpixels):
+            covars.append(np.cov(probabilities[superpixels == i].T).ravel())
+        return np.hstack([sp_probs, np.array(covars)])
+    return sp_probs
 
