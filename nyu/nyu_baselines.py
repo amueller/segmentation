@@ -35,18 +35,18 @@ def train_svm(C=0.1, grid=False):
     ds = NYUSegmentation()
     svm = LinearSVC(C=C, dual=False, class_weight='auto')
 
-    data_train = load_nyu("train", n_sp=500, add_covariance=True)
+    data_train = load_nyu("train", n_sp=500, add_covariance=False)
     X, y = np.vstack(data_train.X), np.hstack(data_train.Y)
     svm.fit(X, y)
     print(svm.score(X, y))
     eval_on_sp(ds, data_train, [svm.predict(x) for x in data_train.X],
                print_results=True)
 
-    data_val = load_nyu("val", n_sp=500, add_covariance=True)
+    data_val = load_nyu("val", n_sp=500, add_covariance=False)
     eval_on_sp(ds, data_val, [svm.predict(x) for x in data_val.X],
                print_results=True)
 
 if __name__ == "__main__":
     #eval_pixel_prediction()
     #eval_sp_prediction()
-    train_svm(C=1000)
+    train_svm(C=1)

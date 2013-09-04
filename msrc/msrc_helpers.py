@@ -9,8 +9,8 @@ from scipy import sparse
 import matplotlib.pyplot as plt
 
 from sklearn.externals.joblib import Memory
+from latent_crf_experiments.utils import transform_chi2
 #from sklearn.metrics import confusion_matrix
-from sklearn.kernel_approximation import AdditiveChi2Sampler
 
 from datasets.msrc import MSRC21Dataset
 
@@ -125,19 +125,6 @@ def concatenate_datasets(data1, data2):
     return DataBunch(X, Y, file_names, superpixels)
 
 
-@memory.cache
-def transform_chi2(data):
-    chi2 = AdditiveChi2Sampler(sample_steps=2)
-    if isinstance(data.X[0], np.ndarray):
-        X_new = [chi2.fit_transform(x).astype(np.float32) for x in data.X]
-    elif len(data.X[0]) == 2:
-        X_new = [(chi2.fit_transform(x[0]), x[1]) for x in data.X]
-    elif len(data.X[0]) == 3:
-        X_new = [(chi2.fit_transform(x[0]), x[1], x[2]) for x in data.X]
-    else:
-        raise ValueError("len(x) is weird: %d" % len(data.X[0]))
-
-    return DataBunch(X_new, data.Y, data.file_names, data.superpixels)
 
 
 def load_kraehenbuehl(filename, which="train"):

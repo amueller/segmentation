@@ -15,10 +15,10 @@ from IPython.core.debugger import Tracer
 tracer = Tracer()
 
 
-def main(C=1, test=False):
+def main(C=1):
     dataset = NYUSegmentation()
     # load training data
-    data_train = load_nyu()
+    data_train = load_nyu(n_sp=500)
     data_train = add_edges(data_train)
     data_train = add_edge_features(dataset, data_train, depth_diff=True)
 
@@ -35,13 +35,12 @@ def main(C=1, test=False):
                           #inference_method='qpbo', class_weight=class_weights)
     model = crfs.EdgeFeatureGraphCRF(inference_method='qpbo',
                                      class_weight=class_weights,
-                                     n_edge_features=4,
-                                     symmetric_edge_features=[0, 1, 3],
-                                     antisymmetric_edge_features=[2])
-    experiment_name = "edge_features_depth_ad3_%f" % C
+                                     #n_edge_features=4,
+                                     symmetric_edge_features=[0, 1])
+    experiment_name = "normals_%f" % C
     ssvm = learners.OneSlackSSVM(
         model, verbose=2, C=C, max_iter=100000, n_jobs=-1,
-        tol=0.001, show_loss_every=10, inference_cache=50, cache_tol='auto',
+        tol=0.001, show_loss_every=100, inference_cache=50, cache_tol='auto',
         logger=SaveLogger(experiment_name + ".pickle", save_every=100),
         inactive_threshold=1e-5, break_on_bad=False, inactive_window=50,
         switch_to=("ad3", {'branch_and_bound':True}))
@@ -52,6 +51,6 @@ def main(C=1, test=False):
 
 
 if __name__ == "__main__":
-    #for C in 10. ** np.arange(-4, 2):
-        #main(C)
-    main(.1, test=False)
+    for C in [.1, 1]:
+        main(C)
+    #main(.1)

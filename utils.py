@@ -5,6 +5,7 @@ import itertools
 import numpy as np
 from scipy import sparse
 
+from sklearn.kernel_approximation import AdditiveChi2Sampler
 from sklearn.externals.joblib import Memory, Parallel, delayed
 from pystruct.utils import make_grid_edges
 
@@ -12,6 +13,21 @@ DataBunch = namedtuple('DataBunch', 'X, Y, file_names, superpixels')
 DataBunchNoSP = namedtuple('DataBunchNoSP', 'X, Y, file_names')
 
 memory = Memory(cachedir="/home/data/amueller/cache", verbose=1)
+
+
+@memory.cache
+def transform_chi2(data):
+    chi2 = AdditiveChi2Sampler(sample_steps=2)
+    if isinstance(data.X[0], np.ndarray):
+        X_new = [chi2.fit_transform(x).astype(np.float32) for x in data.X]
+    elif len(data.X[0]) == 2:
+        X_new = [(chi2.fit_transform(x[0]), x[1]) for x in data.X]
+    elif len(data.X[0]) == 3:
+        X_new = [(chi2.fit_transform(x[0]), x[1], x[2]) for x in data.X]
+    else:
+        raise ValueError("len(x) is weird: %d" % len(data.X[0]))
+
+    return DataBunch(X_new, data.Y, data.file_names, data.superpixels)
 
 
 @memory.cache
@@ -166,15 +182,16 @@ def get_edge_contrast(edges, image, superpixels, gamma=10):
     return np.vstack(contrasts)
 
 
-def get_edge_depth_diff(edges, depth, superpixels, gamma=10):
+def get_edge_depth_diff(edges, depth, superpixels):
     mean_depth = np.bincount(superpixels.ravel(), weights=depth.ravel())
     mean_depth = mean_depth / np.bincount(superpixels.ravel()).T
-    depth_diff = [np.exp(-gamma * np.linalg.norm(mean_depth[e[0]]
-                                                - mean_depth[e[1]]))
-                 for e in edges]
-    #depth_diff = [(mean_depth[e[0]] - mean_depth[e[1]]) ** 2
+    #depth_diff = [np.exp(-gamma * np.linalg.norm(mean_depth[e[0]]
+                                                #- mean_depth[e[1]]))
                  #for e in edges]
+    depth_diff = [(mean_depth[e[0]] - mean_depth[e[1]])
+                 for e in edges]
     return np.vstack(depth_diff)
+
 
 
 def get_superpixel_centers(superpixels):
@@ -208,29 +225,47 @@ def get_edge_directions(edges, superpixels):
     return np.vstack(directions)
 
 
+def get_normal_angles(edges, normals, superpixels):
+    mean_normals = []
+    for i in np.unique(superpixels):
+        this_normals = normals[superpixels == i]
+        this_normals = this_normals[np.isfinite(this_normals.sum(axis=-1))]
+        mean_normals.append(this_normals.mean(axis=0))
+    mean_normals = np.vstack(mean_normals)
+
+    product = np.sum(mean_normals[edges[:, 0]] * mean_normals[edges[:, 1]], axis=1)
+    return 1 - np.arccos(np.abs(product)) * 2. / np.pi
+
+
 def edge_features_single(dataset, x, superpixels, file_name, more_colors=False,
-                         depth_diff=False, center_distances=False):
-    features = [np.ones((x[1].shape[0], 1))]
+                         depth_diff=False, center_distances=False, normal_angles=False):
+    edges = x[1]
+    features = [np.ones((edges.shape[0], 1))]
     image = dataset.get_image(file_name)
     if more_colors:
-        features.append(get_edge_contrast(x[1], image, superpixels,
+        features.append(get_edge_contrast(edges, image, superpixels,
                                           gamma=5))
-        features.append(get_edge_contrast(x[1], image, superpixels,
+        features.append(get_edge_contrast(edges, image, superpixels,
                                           gamma=10))
-        features.append(get_edge_contrast(x[1], image, superpixels,
+        features.append(get_edge_contrast(edges, image, superpixels,
                                           gamma=20))
-        features.append(get_edge_contrast(x[1], image, superpixels,
+        features.append(get_edge_contrast(edges, image, superpixels,
                                           gamma=100))
     else:
-        features.append(get_edge_contrast(x[1], image, superpixels,
+        features.append(get_edge_contrast(edges, image, superpixels,
                                           gamma=10))
     if depth_diff:
         depth = dataset.get_depth(file_name)
-        features.append(get_edge_depth_diff(x[1], depth, superpixels, gamma=10))
-    if center_distances:
-        features.append(get_center_distances(x[1], superpixels))
+        features.append(get_edge_depth_diff(edges, depth, superpixels))
 
-    features.append(get_edge_directions(x[1], superpixels))
+    if center_distances:
+        features.append(get_center_distances(edges, superpixels))
+
+    if normal_angles:
+        normals = dataset.get_normals(file_name)
+        features.append(get_normal_angles(edges, normals, superpixels))
+
+    features.append(get_edge_directions(edges, superpixels))
     return np.hstack(features)
 
 
