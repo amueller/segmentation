@@ -118,7 +118,9 @@ def get_pb(filename):
     return pb
 
 
-def merge_small_sp(image, regions, min_size=50):
+def merge_small_sp(image, regions, min_size=None):
+    if min_size is None:
+        min_size = np.prod(image.shape[:2]) / float(np.max(regions) + 1)
     shape = regions.shape
     _, regions = np.unique(regions, return_inverse=True)
     regions = regions.reshape(shape[:2])

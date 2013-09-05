@@ -54,9 +54,6 @@ def main():
 
         ssvm.n_jobs = 1
 
-        #for data_str, title in zip(["train", "val", "test"],
-                                   #["TRAINING SET", "VALIDATION SET",
-                                    #"TEST SET"]):
         for data_str, title in zip(["train", "val"],
                                    ["TRAINING SET", "VALIDATION SET"]):
             print(title)
@@ -93,7 +90,7 @@ def main():
             # may Guido have mercy on my soul
             #(I renamed the module after pickling)
             if type(ssvm.model).__name__ == 'EdgeFeatureGraphCRF':
-                data = add_edge_features(ds, data, depth_diff=False)
+                data = add_edge_features(ds, data, depth_diff=True, normal_angles=True)
 
             if type(ssvm.model).__name__ == "EdgeFeatureLatentNodeCRF":
                 data = add_edge_features(ds, data)

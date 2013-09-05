@@ -23,11 +23,8 @@ def eval_pixel_prediction():
 
 def eval_sp_prediction():
     dataset = NYUSegmentation()
-    data = load_nyu('train')
+    data = load_nyu('train', n_sp=500, sp='rgb-skimage')
     predictions = [np.argmax(x, axis=-1) for x in data.X]
-    y_true = np.hstack(data.Y)
-    y_pred = np.hstack(predictions)
-    print(confusion_matrix(y_true, y_pred))
     hamming, jaccard = eval_on_sp(dataset, data, predictions, print_results=True)
     tracer()
 
@@ -48,5 +45,5 @@ def train_svm(C=0.1, grid=False):
 
 if __name__ == "__main__":
     #eval_pixel_prediction()
-    #eval_sp_prediction()
-    train_svm(C=1)
+    eval_sp_prediction()
+    #train_svm(C=1)

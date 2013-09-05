@@ -5,13 +5,14 @@ import numpy as np
 from sklearn.externals.joblib import Memory, Parallel, delayed
 from scipy.misc import imread
 #import matplotlib.pyplot as plt
-#from skimage.segmentation import mark_boundaries
 
 from datasets.nyu import NYUSegmentation
 
 from slic_python import slic_n
 from latent_crf_experiments.utils import (DataBunchNoSP, DataBunch, gt_in_sp,
                                           probabilities_on_sp)
+from skimage.segmentation import slic
+from skimage import morphology
 
 memory = Memory(cachedir="/home/data/amueller/cache")
 
@@ -26,23 +27,36 @@ def get_probabilities(file_name, path):
     return probabilities / 255.
 
 
-def load_single_file(dataset, file_name, n_sp=300, add_covariance=False):
+def load_single_file(dataset, file_name, n_sp=300, sp='rgb'):
     print(file_name)
     image = dataset.get_image(file_name)
-    sp = slic_n(image, n_superpixels=n_sp, compactness=10)
-    gt = gt_in_sp(dataset, file_name, sp)
+    if sp == 'rgb':
+        sps = slic_n(image, n_superpixels=n_sp, compactness=10)
+    elif sp == 'rgb-skimage':
+        sps = slic(image, n_segments=n_sp, compactness=10, multichannel=True)
+        sps = remove_small_sp(morphology.label(sps))
+    elif sp == 'rgbd':
+        depth = dataset.get_depth(file_name)
+        depth -= depth.min()
+        depth /= depth.max()
+        rgbd = np.dstack([image / 255., depth])
+        sps = slic(rgbd, n_segments=n_sp, compactness=.1, convert2lab=False, multichannel=True)
+    else:
+        raise ValueError("Expected sp to be 'rgb' or 'rgbd' got %d" % sp)
+
+    gt = gt_in_sp(dataset, file_name, sps)
     probs = get_probabilities(file_name, dataset.directory)
-    probs_sp = probabilities_on_sp(dataset, probs, sp,
-                                   add_covariance=add_covariance)
-    return probs_sp, gt, sp
+    probs_sp = probabilities_on_sp(dataset, probs, sps)
+    return probs_sp, gt, sps
 
 
 @memory.cache
-def load_nyu(ds='train', n_sp=300, add_covariance=False):
+def load_nyu(ds='train', n_sp=300, sp='rgb'):
+    # trigger cache?
     dataset = NYUSegmentation()
     file_names = dataset.get_split(ds)
     # load image to generate superpixels
-    result = Parallel(n_jobs=-1)(delayed(load_single_file)(dataset, f, n_sp, add_covariance)
+    result = Parallel(n_jobs=-1)(delayed(load_single_file)(dataset, f, n_sp, sp)
                                  for f in file_names)
     X, Y, superpixels = zip(*result)
 

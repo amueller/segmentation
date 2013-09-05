@@ -225,16 +225,27 @@ def get_edge_directions(edges, superpixels):
     return np.vstack(directions)
 
 
+def get_sp_normals(normals, superpixels):
+    normals_flat = normals.reshape(-1, 3)
+    n_sp = np.max(superpixels) + 1
+    mask = np.isfinite(normals_flat.sum(axis=1))
+    superpixels = superpixels.ravel()[mask]
+    normals_flat = normals_flat[mask]
+    x = np.bincount(superpixels, weights=normals_flat[:, 0], minlength=n_sp)
+    y = np.bincount(superpixels, weights=normals_flat[:, 1], minlength=n_sp)
+    z = np.bincount(superpixels, weights=normals_flat[:, 2], minlength=n_sp)
+    mean_normals = np.vstack([x, y, z]).T
+    lengths = np.maximum(1e-3, np.sqrt(np.sum(mean_normals ** 2, axis=1)))
+    mean_normals /= lengths[:, np.newaxis]
+    return mean_normals
+
+
 def get_normal_angles(edges, normals, superpixels):
-    mean_normals = []
-    for i in np.unique(superpixels):
-        this_normals = normals[superpixels == i]
-        this_normals = this_normals[np.isfinite(this_normals.sum(axis=-1))]
-        mean_normals.append(this_normals.mean(axis=0))
-    mean_normals = np.vstack(mean_normals)
+    mean_normals = get_sp_normals(normals, superpixels)
 
     product = np.sum(mean_normals[edges[:, 0]] * mean_normals[edges[:, 1]], axis=1)
-    return 1 - np.arccos(np.abs(product)) * 2. / np.pi
+    product[~np.isfinite(product)] = 0
+    return (1 - np.arccos(np.abs(product)) * 2. / np.pi)[:, np.newaxis]
 
 
 def edge_features_single(dataset, x, superpixels, file_name, more_colors=False,
@@ -262,7 +273,7 @@ def edge_features_single(dataset, x, superpixels, file_name, more_colors=False,
         features.append(get_center_distances(edges, superpixels))
 
     if normal_angles:
-        normals = dataset.get_normals(file_name)
+        normals = dataset.get_pointcloud_normals(file_name)[:, :, 3:]
         features.append(get_normal_angles(edges, normals, superpixels))
 
     features.append(get_edge_directions(edges, superpixels))
@@ -270,23 +281,16 @@ def edge_features_single(dataset, x, superpixels, file_name, more_colors=False,
 
 
 @memory.cache
-def add_edge_features(dataset, data, more_colors=False,
-                      center_distances=False, depth_diff=False):
-    all_edge_features = Parallel(n_jobs=-1, verbose=4)(
-        delayed(edge_features_single)( dataset, x, superpixels, file_name,
+def add_edge_features(dataset, data, more_colors=False, center_distances=False,
+                      depth_diff=False, normal_angles=False):
+    # trigger cache ...
+    all_edge_features = Parallel(n_jobs=1, verbose=4)(
+        delayed(edge_features_single)(dataset, x, superpixels, file_name,
                                       more_colors=more_colors,
                                       center_distances=center_distances,
-                                      depth_diff=depth_diff)
+                                      depth_diff=depth_diff, normal_angles=normal_angles)
         for x, superpixels, file_name in zip(data.X, data.superpixels,
                                              data.file_names))
-    #X = []
-    #for x, superpixels, file_name in zip(data.X, data.superpixels,
-                                         #data.file_names):
-        #features = edge_features_single(dataset, x, superpixels, file_name,
-                                        #more_colors=more_colors,
-                                        #center_distances=center_distances,
-                                        #depth_diff=depth_diff)
-        #X.append((x[0], x[1], np.hstack(features)))
     X = [(x[0], x[1], features) for x, features in zip(data.X, all_edge_features)]
     return DataBunch(X, data.Y, data.file_names, data.superpixels)
 
