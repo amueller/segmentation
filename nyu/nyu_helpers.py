@@ -11,6 +11,7 @@ from datasets.nyu import NYUSegmentation
 from slic_python import slic_n
 from latent_crf_experiments.utils import (DataBunchNoSP, DataBunch, gt_in_sp,
                                           probabilities_on_sp)
+from latent_crf_experiments.pascal.pascal_helpers import merge_small_sp
 from skimage.segmentation import slic
 from skimage import morphology
 
@@ -33,14 +34,15 @@ def load_single_file(dataset, file_name, n_sp=300, sp='rgb'):
     if sp == 'rgb':
         sps = slic_n(image, n_superpixels=n_sp, compactness=10)
     elif sp == 'rgb-skimage':
-        sps = slic(image, n_segments=n_sp, compactness=10, multichannel=True)
-        sps = remove_small_sp(morphology.label(sps))
+        sps = slic(image, n_segments=n_sp, compactness=10, multichannel=True, sigma=0.1)
+        sps = merge_small_sp(image, morphology.label(sps))[0]
     elif sp == 'rgbd':
         depth = dataset.get_depth(file_name)
-        depth -= depth.min()
-        depth /= depth.max()
+        #depth -= depth.min()
+        #depth /= depth.max()
         rgbd = np.dstack([image / 255., depth])
-        sps = slic(rgbd, n_segments=n_sp, compactness=.1, convert2lab=False, multichannel=True)
+        sps = slic(rgbd, n_segments=n_sp, compactness=.1, convert2lab=False, multichannel=True, sigma=0)
+        sps = merge_small_sp(image, morphology.label(sps))[0]
     else:
         raise ValueError("Expected sp to be 'rgb' or 'rgbd' got %d" % sp)
 
@@ -52,22 +54,13 @@ def load_single_file(dataset, file_name, n_sp=300, sp='rgb'):
 
 @memory.cache
 def load_nyu(ds='train', n_sp=300, sp='rgb'):
-    # trigger cache?
+    # trigger cache 1.
     dataset = NYUSegmentation()
     file_names = dataset.get_split(ds)
     # load image to generate superpixels
     result = Parallel(n_jobs=-1)(delayed(load_single_file)(dataset, f, n_sp, sp)
                                  for f in file_names)
     X, Y, superpixels = zip(*result)
-
-    #file_names, X, Y, superpixels = [], [], [], []
-    #for file_name in dataset.get_split(ds):
-        #sp, gt, probs = load_single_file(dataset, file_name)
-        ### load image to generate superpixels
-        #Y.append(gt)
-        #superpixels.append(sp)
-        #file_names.append(file_name)
-        #X.append(probs)
 
     return DataBunch(X, Y, file_names, superpixels)
 
