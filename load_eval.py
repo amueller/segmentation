@@ -73,7 +73,7 @@ def main():
                 data = pascal_helpers.load_pascal(data_str, sp_type="cpmc")
                 #data = pascal_helpers.load_pascal(data_str)
             elif dataset == 'nyu':
-                data = nyu_helpers.load_nyu(data_str, n_sp=500)
+                data = nyu_helpers.load_nyu(data_str, n_sp=500, sp='rgbd')
             else:
                 raise ValueError("Excepted dataset to be 'nyu', 'pascal' or 'msrc',"
                                  " got %s." % dataset)
@@ -90,7 +90,7 @@ def main():
             # may Guido have mercy on my soul
             #(I renamed the module after pickling)
             if type(ssvm.model).__name__ == 'EdgeFeatureGraphCRF':
-                data = add_edge_features(ds, data, depth_diff=True, normal_angles=True)
+                data = add_edge_features(ds, data, depth_diff=False, normal_angles=False)
 
             if type(ssvm.model).__name__ == "EdgeFeatureLatentNodeCRF":
                 data = add_edge_features(ds, data)
