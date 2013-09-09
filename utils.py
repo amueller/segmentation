@@ -190,7 +190,8 @@ def get_edge_depth_diff(edges, depth, superpixels):
                  #for e in edges]
     depth_diff = [(mean_depth[e[0]] - mean_depth[e[1]])
                  for e in edges]
-    return np.vstack(depth_diff)
+    depth_diff = np.vstack(depth_diff)
+    return depth_diff / np.abs(depth_diff).max()
 
 
 
@@ -283,7 +284,7 @@ def edge_features_single(dataset, x, superpixels, file_name, more_colors=False,
 @memory.cache
 def add_edge_features(dataset, data, more_colors=False, center_distances=False,
                       depth_diff=False, normal_angles=False):
-    # trigger cache ...
+    # trigger cache ..
     all_edge_features = Parallel(n_jobs=1, verbose=4)(
         delayed(edge_features_single)(dataset, x, superpixels, file_name,
                                       more_colors=more_colors,
@@ -305,9 +306,12 @@ def gt_in_sp(dataset, filename, superpixels):
 def eval_on_pixels(dataset, Y_true, Y_pred, print_results=False):
     n_classes = len(dataset.classes) - 1  # -1 for void
     tp, tn, fp, fn = [np.zeros(n_classes) for i in xrange(4)]
+    correct, total = 0, 0
     for y_true, y_pred in zip(Y_true, Y_pred):
         mask = y_true != dataset.void_label
         y_true, y_pred = y_true[mask], y_pred[mask]
+        correct += np.sum(y_true == y_pred)
+        total += len(y_true)
         for k in range(n_classes):
             tp[k] += np.sum((y_true == k) * (y_pred == k))
             tn[k] += np.sum((y_true != k) * (y_pred != k))
@@ -323,6 +327,7 @@ def eval_on_pixels(dataset, Y_true, Y_pred, print_results=False):
         print(hamming)
         print("Mean Jaccard: %.1f   Mean Hamming: %.1f"
               % (np.mean(jaccard), np.mean(hamming)))
+        print("Total : %.1f" % (correct / float(total) * 100))
 
     return hamming, jaccard
 
