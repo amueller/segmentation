@@ -20,7 +20,7 @@ def main(C=1):
     # load training data
     data_train = load_nyu(n_sp=500, sp='rgbd')
     data_train = add_edges(data_train)
-    data_train = add_edge_features(dataset, data_train, depth_diff=False, normal_angles=False)
+    data_train = add_edge_features(dataset, data_train, depth_diff=True, normal_angles=True)
 
     data_train = discard_void(dataset, data_train)
 
@@ -35,7 +35,7 @@ def main(C=1):
                           #inference_method='qpbo', class_weight=class_weights)
     model = crfs.EdgeFeatureGraphCRF(inference_method='qpbo',
                                      class_weight=class_weights,
-                                     n_edge_features=3,
+                                     n_edge_features=5,
                                      symmetric_edge_features=[0, 1])
     experiment_name = "rgbd_test%f" % C
     ssvm = learners.OneSlackSSVM(
