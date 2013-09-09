@@ -54,7 +54,7 @@ def main():
 
         ssvm.n_jobs = 1
 
-        for data_str, title in zip(["train", "val"],
+        for data_str, title in zip(["trainval", "test"],
                                    ["TRAINING SET", "VALIDATION SET"]):
             print(title)
             edge_type = "pairwise"
@@ -90,7 +90,7 @@ def main():
             # may Guido have mercy on my soul
             #(I renamed the module after pickling)
             if type(ssvm.model).__name__ == 'EdgeFeatureGraphCRF':
-                data = add_edge_features(ds, data, depth_diff=False, normal_angles=False)
+                data = add_edge_features(ds, data, depth_diff=True, normal_angles=True)
 
             if type(ssvm.model).__name__ == "EdgeFeatureLatentNodeCRF":
                 data = add_edge_features(ds, data)
@@ -115,7 +115,7 @@ def main():
                 #msrc_helpers.plot_confusion_matrix(res['confusion'])
             else:
                 hamming, jaccard = eval_on_sp(ds, data, Y_pred,
-                                              print_results=False)
+                                              print_results=True)
                 print("Jaccard: %.2f, Hamming: %.2f" % (jaccard.mean(),
                                                         hamming.mean()))
 
