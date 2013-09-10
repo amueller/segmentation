@@ -21,6 +21,7 @@ from datasets.pascal import PascalSegmentation
 from datasets.nyu import NYUSegmentation
 
 from utils import add_edges, eval_on_sp, add_edge_features
+from plotting import plot_results
 
 
 
@@ -54,25 +55,22 @@ def main():
 
         ssvm.n_jobs = 1
 
-        for data_str, title in zip(["trainval", "test"],
+        for data_str, title in zip(["train", "val"],
                                    ["TRAINING SET", "VALIDATION SET"]):
             print(title)
             edge_type = "pairwise"
-            if dataset == 'pascal':
-                ds = PascalSegmentation()
-            elif dataset == 'nyu':
-                ds = NYUSegmentation()
-            else:
-                ds = MSRC21Dataset()
 
             if dataset == 'msrc':
+                ds = MSRC21Dataset()
                 data = msrc_helpers.load_data(data_str, which="piecewise_new")
                 #data = add_kraehenbuehl_features(data, which="train_30px")
                 data = msrc_helpers.add_kraehenbuehl_features(data, which="train")
             elif dataset == 'pascal':
+                ds = PascalSegmentation()
                 data = pascal_helpers.load_pascal(data_str, sp_type="cpmc")
                 #data = pascal_helpers.load_pascal(data_str)
             elif dataset == 'nyu':
+                ds = NYUSegmentation()
                 data = nyu_helpers.load_nyu(data_str, n_sp=500, sp='rgbd')
             else:
                 raise ValueError("Excepted dataset to be 'nyu', 'pascal' or 'msrc',"
@@ -87,8 +85,6 @@ def main():
             else:
                 data = add_edges(data, edge_type)
 
-            # may Guido have mercy on my soul
-            #(I renamed the module after pickling)
             if type(ssvm.model).__name__ == 'EdgeFeatureGraphCRF':
                 data = add_edge_features(ds, data, depth_diff=True, normal_angles=True)
 
@@ -126,40 +122,29 @@ def main():
         if len(argv) <= 4:
             raise ValueError("Need a folder name for plotting.")
         if dataset == "msrc":
+            ds = MSRC21Dataset()
             data = msrc_helpers.load_data(data_str, which="piecewise")
             data = add_edges(data, independent=False)
             data = msrc_helpers.add_kraehenbuehl_features(
                 data, which="train_30px")
             data = msrc_helpers.add_kraehenbuehl_features(
                 data, which="train")
-            if type(ssvm.model).__name__ == 'EdgeFeatureGraphCRF':
-                data = msrc_helpers.add_edge_features(data)
-            ssvm.model.inference_method = 'qpbo'
-            if isinstance(ssvm.model, LatentNodeCRF):
-                data = msrc_helpers.make_hierarchical_data(data, lateral=True,
-                                                           latent=True)
-                try:
-                    Y_pred = ssvm.predict_latent(data.X)
-                except AttributeError:
-                    Y_pred = ssvm.predict(data.X)
-
-                msrc_helpers.plot_results_hierarchy(data, Y_pred, argv[4])
-            else:
-                Y_pred = ssvm.predict(data.X)
-                msrc_helpers.plot_results(data, Y_pred, argv[4])
 
         elif dataset == "pascal":
-                data = pascal_helpers.load_pascal("val")
-                data = add_edges(data)
-                if type(ssvm.model).__name__ == 'EdgeFeatureGraphCRF':
-                    data = pascal_helpers.add_edge_features(data)
-                Y_pred = ssvm.predict(data.X)
-                pascal_helpers.plot_results(data, Y_pred, argv[4])
-                #ssvm.model.inference_method = 'qpbo'
-                #if isinstance(ssvm.model, LatentNodeCRF):
-                    #data = pascal_helpers.make_hierarchical_data(data,
-                                                                 #lateral=True,
-                                                                 #latent=True)
+            ds = PascalSegmentation()
+            data = pascal_helpers.load_pascal("val")
+            data = add_edges(data)
+
+        elif dataset == "nyu":
+            ds = NYUSegmentation()
+            data = nyu_helpers.load_nyu("test")
+            data = add_edges(data)
+
+        if type(ssvm.model).__name__ == 'EdgeFeatureGraphCRF':
+            data = add_edge_features(ds, data, depth_diff=True, normal_angles=True)
+        Y_pred = ssvm.predict(data.X)
+
+        plot_results(ds, data, Y_pred, argv[4])
 
 
 if __name__ == "__main__":
