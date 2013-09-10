@@ -21,7 +21,7 @@ def make_hierarchy_edges(segments, superpixels):
         edge_matrix = sparse.coo_matrix((np.ones(edges.shape[1]), edges))
         # make edges unique
         edges = np.vstack(edge_matrix.tocsr().nonzero()).T
-        all_edges.append(edges)
+        all_edges.append(np.sort(edges, axis=1))
     return all_edges
 
 
